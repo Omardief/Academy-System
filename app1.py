@@ -5,6 +5,10 @@ import datetime
 import plotly.express as px
 import base64
 import math
+
+# إعدادات Streamlit
+st.set_page_config(page_title="Pioneer Academy", layout="wide")
+
 # ---------------------------
 # إعداد الاتصال مع Supabase
 # ---------------------------
@@ -672,8 +676,7 @@ def display_premium_logo():
     </div>
     """, unsafe_allow_html=True)
 
-# إعدادات Streamlit
-st.set_page_config(page_title="Pioneer Academy", layout="wide")
+
 set_premium_style()
 
 # إدارة حالة تسجيل الدخول
