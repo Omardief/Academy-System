@@ -673,7 +673,7 @@ def display_premium_logo():
     """, unsafe_allow_html=True)
 
 # إعدادات Streamlit
-st.set_page_config(page_title="Pioneer Academy", layout="wide", page_icon="🎓")
+st.set_page_config(page_title="Pioneer Academy", layout="wide")
 set_premium_style()
 
 # إدارة حالة تسجيل الدخول
