@@ -1,1 +1,1 @@
-streamlit
+streamlit supabase pandas plotly
