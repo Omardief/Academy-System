@@ -23,36 +23,69 @@ supabase = init_supabase()
 # ---------------------------
 # دوال للتعامل مع الجامعات
 # ---------------------------
+def check_duplicate_university(name):
+    """التحقق من عدم وجود جامعة بنفس الاسم"""
+    try:
+        response = supabase.table("universities").select("name").eq("name", name).execute()
+        return len(response.data) > 0 if response.data else False
+    except Exception as e:
+        st.error(f"Error checking duplicate: {e}")
+        return False
+
 def add_university(name, location):
     """إضافة جامعة جديدة للجدول"""
-    response = supabase.table("universities").insert({"name": name, "location": location}).execute()
-    return response.data, response.error
-
+    try:
+        # 🔥 التحقق من التكرار أولاً
+        if check_duplicate_university(name):
+            return None, "University with this name already exists"
+            
+        response = supabase.table("universities").insert({
+            "name": name, 
+            "location": location
+        }).execute()
+        
+        if hasattr(response, 'data') and response.data:
+            # 🔥 مسح الكاش بعد الإضافة الناجحة
+            st.cache_data.clear()
+            return response.data, None
+        else:
+            error_msg = getattr(response, 'error', None)
+            return None, str(error_msg) if error_msg else "Unknown error occurred"
+                
+    except Exception as e:
+        return None, str(e)
+    
 def get_universities():
     """جلب كل الجامعات من الجدول"""
-    response = supabase.table("universities").select("id, name, location").execute()
-    if response.data:
-        return pd.DataFrame(response.data)
-    return pd.DataFrame(columns=["id", "name", "location"])
+    try:
+        response = supabase.table("universities").select("id, name, location").execute()
+        
+        # 🔥 التصحيح: التحقق من البيانات بشكل صحيح
+        if hasattr(response, 'data') and response.data:
+            return pd.DataFrame(response.data)
+        else:
+            return pd.DataFrame(columns=["id", "name", "location"])
+            
+    except Exception as e:
+        st.error(f"Error fetching universities: {e}")
+        return pd.DataFrame(columns=["id", "name", "location"])
 
 # ---------------------------
 # دوال للتعامل مع الكورسات
 # ---------------------------
-def add_course(university_id, name, price, before_mid, after_mid, session_price,
-               instructor_name, course_day, course_time):
+def add_course(university_id, name, price, before_mid, after_mid, session_price, instructor_name, course_day, course_time):
     try:
-        # تأكد إن القيم converted لأنواع عادية
-        university_id = int(university_id)  # int64 → int
+        # تحويل البيانات
+        university_id = int(university_id)
         price = float(price)
         before_mid = float(before_mid)
         after_mid = float(after_mid)
         session_price = float(session_price)
 
-        # time → string (HH:MM:SS)
         if course_time:
             course_time = course_time.strftime("%H:%M:%S")
 
-        data, error = supabase.table("courses").insert({
+        response = supabase.table("courses").insert({
             "university_id": university_id,
             "name": name,
             "price": price,
@@ -64,26 +97,34 @@ def add_course(university_id, name, price, before_mid, after_mid, session_price,
             "course_time": course_time
         }).execute()
 
-        return data, error
+        # 🔥 التصحيح: نفس المنطق
+        if hasattr(response, 'data') and response.data:
+            return response.data, None
+        else:
+            error_msg = getattr(response, 'error', None)
+            if error_msg:
+                return None, str(error_msg)
+            else:
+                return None, "Unknown error occurred"
+                
     except Exception as e:
         return None, str(e)
 
-
 def get_courses():
-    response = supabase.table("courses").select("* , universities(name)").execute()
-    if response.data:
-        return pd.DataFrame(response.data)
-    return pd.DataFrame(columns=["id","name","price","before_mid","after_mid","session_price","instructor_name","course_day","course_time","university_id"])
-
+    try:
+        response = supabase.table("courses").select("* , universities(name)").execute()
+        
+        if hasattr(response, 'data') and response.data:
+            return pd.DataFrame(response.data)
+        return pd.DataFrame(columns=["id","name","price","before_mid","after_mid","session_price","instructor_name","course_day","course_time","university_id"])
+    except Exception as e:
+        st.error(f"Error fetching courses: {e}")
+        return pd.DataFrame(columns=["id","name","price","before_mid","after_mid","session_price","instructor_name","course_day","course_time","university_id"])
 
 # ---------------------------
 # دوال للتعامل مع الطلاب
 # ---------------------------
 def add_student(name, phone, gmail, university_id, department):
-    """
-    يضيف طالب جديد مع عمود department.
-    يرجع (data, error) مشابه لباقي الدوال في الكود.
-    """
     try:
         response = supabase.table("students").insert({
             "name": name,
@@ -92,53 +133,78 @@ def add_student(name, phone, gmail, university_id, department):
             "university_id": int(university_id) if university_id else None,
             "department": department
         }).execute()
-        return response.data, response.error
+        
+        # 🔥 التصحيح: نفس المنطق
+        if hasattr(response, 'data') and response.data:
+            return response.data, None
+        else:
+            error_msg = getattr(response, 'error', None)
+            if error_msg:
+                return None, str(error_msg)
+            else:
+                return None, "Unknown error occurred"
+                
     except Exception as e:
         return None, str(e)
 
 
 def get_students():
-    """
-    يجلب الطلاب مع اسم الجامعة (joins عبر select nested).
-    يرجع pandas.DataFrame جاهز للعرض.
-    """
-    response = supabase.table("students").select("id, name, phone, gmail, department, universities(name)").execute()
-    if not response.data:
+    try:
+        response = supabase.table("students").select("id, name, phone, gmail, department, universities(name)").execute()
+        
+        if not response.data:
+            return pd.DataFrame(columns=["id", "name", "phone", "gmail", "department", "university"])
+
+        df = pd.DataFrame(response.data)
+
+        if "universities" in df.columns:
+            df["university"] = df["universities"].apply(lambda x: x.get("name") if isinstance(x, dict) else (x if isinstance(x, str) else None))
+            df = df.drop(columns=["universities"])
+
+        cols = ["id", "name", "phone", "gmail", "department", "university"]
+        for c in cols:
+            if c not in df.columns:
+                df[c] = None
+        return df[cols]
+        
+    except Exception as e:
+        st.error(f"Error fetching students: {e}")
         return pd.DataFrame(columns=["id", "name", "phone", "gmail", "department", "university"])
-
-    df = pd.DataFrame(response.data)
-
-    # بعض صفوف 'universities' تكون None أو dict => نحولها لاسم الجامعة في عمود 'university'
-    if "universities" in df.columns:
-        df["university"] = df["universities"].apply(lambda x: x.get("name") if isinstance(x, dict) else (x if isinstance(x, str) else None))
-        df = df.drop(columns=["universities"])
-
-    # إعادة ترتيب الأعمدة للعرض
-    cols = ["id", "name", "phone", "gmail", "department", "university"]
-    for c in cols:
-        if c not in df.columns:
-            df[c] = None
-    df = df[cols]
-    return df
-
 # ---------------------------
 # دوال مساعدة للتسجيل
 # ---------------------------
 def get_students_by_university(university_id):
-    """ارجع DataFrame بالطلاب التابعين لجامعة معينة"""
-    resp = supabase.table("students").select("id, name, phone, gmail, department").eq("university_id", int(university_id)).execute()
-    if resp.data:
-        return pd.DataFrame(resp.data)
-    return pd.DataFrame(columns=["id","name","phone","gmail","department"])
+    try:
+        resp = supabase.table("students").select("id, name, phone, gmail, department").eq("university_id", int(university_id)).execute()
+        if resp.data:
+            return pd.DataFrame(resp.data)
+        return pd.DataFrame(columns=["id","name","phone","gmail","department"])
+    except Exception as e:
+        st.error(f"Error fetching students by university: {e}")
+        return pd.DataFrame(columns=["id","name","phone","gmail","department"])
 
 def get_courses_by_university(university_id):
-    """ارجع DataFrame بالكورسات التابعة لجامعة معينة"""
-    resp = supabase.table("courses").select("id, name, price, before_mid, after_mid, session_price, instructor_name").eq("university_id", int(university_id)).execute()
-    if resp.data:
-        return pd.DataFrame(resp.data)
-    return pd.DataFrame(columns=["id","name","price","before_mid","after_mid","session_price","instructor_name"])
+    try:
+        resp = supabase.table("courses").select("id, name, price, before_mid, after_mid, session_price, instructor_name").eq("university_id", int(university_id)).execute()
+        if resp.data:
+            return pd.DataFrame(resp.data)
+        return pd.DataFrame(columns=["id","name","price","before_mid","after_mid","session_price","instructor_name"])
+    except Exception as e:
+        st.error(f"Error fetching courses by university: {e}")
+        return pd.DataFrame(columns=["id","name","price","before_mid","after_mid","session_price","instructor_name"])
 
+# 🔥 دالة مساعدة موحدة للتعامل مع الـ responses
 def _handle_response(resp):
+    """دالة مساعدة للتعامل مع responses من Supabase"""
+    try:
+        if hasattr(resp, 'data'):
+            data = resp.data
+            error = getattr(resp, 'error', None)
+            return data, str(error) if error else None
+        else:
+            return None, "Invalid response format"
+    except Exception as e:
+        return None, str(e)
     try:
         return getattr(resp, "data", None), getattr(resp, "error", None)
     except Exception as e:
@@ -895,12 +961,17 @@ elif page == "الجامعات":
     # --- إضافة جامعة ---
     with tab1:
         st.markdown('<div class="section-header">➕ إضافة جامعة جديدة</div>', unsafe_allow_html=True)
+        
+        # 🔥 استخدام session state لمنع الإرسال المكرر
+        if 'university_submitted' not in st.session_state:
+            st.session_state.university_submitted = False
+            
         with st.form("add_university_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                name = st.text_input("اسم الجامعة")
+                name = st.text_input("اسم الجامعة", key="uni_name_input")
             with col2:
-                location = st.text_input("المكان")
+                location = st.text_input("المكان", key="uni_location_input")
 
             submit = st.form_submit_button("إضافة")
 
@@ -908,21 +979,68 @@ elif page == "الجامعات":
                 if name.strip() == "":
                     st.error("❌ من فضلك أدخل اسم الجامعة")
                 else:
-                    data, error = add_university(name, location)
-                    if error:
-                        st.error(f"❌ خطأ: {error}")
+                    # 🔥 التحقق من عدم وجود جامعة بنفس الاسم أولاً
+                    existing_unis = get_universities()
+                    if not existing_unis.empty and name in existing_unis['name'].values:
+                        st.error("❌ جامعة بنفس الاسم موجودة بالفعل!")
                     else:
-                        st.success("✅ تم إضافة الجامعة بنجاح")
+                        data, error = add_university(name, location)
+                        if error:
+                            # 🔥 معالجة الخطأ بشكل أفضل
+                            if "duplicate key" in str(error) or "23505" in str(error):
+                                st.error("❌ جامعة بنفس الاسم موجودة بالفعل!")
+                            else:
+                                st.error(f"❌ خطأ: {error}")
+                        else:
+                            st.success("✅ تم إضافة الجامعة بنجاح")
+                            # 🔥 استخدام success message بدل rerun
+                            st.session_state.university_submitted = True
+                            
+        # 🔥 عرض رسالة النجاح بدون استخدام rerun
+        if st.session_state.get('university_submitted', False):
+            st.info("✅ تمت إضافة الجامعة بنجاح. يمكنك إضافة جامعة جديدة أو الانتقال إلى تبويب العرض.")
+            if st.button("إضافة جامعة أخرى"):
+                st.session_state.university_submitted = False
+                st.rerun()
 
     # --- عرض الجامعات ---
     with tab2:
         st.markdown('<div class="section-header">📋 قائمة الجامعات</div>', unsafe_allow_html=True)
-        df = get_universities()
-        if not df.empty:
-            st.dataframe(df, use_container_width=True)
-        else:
-            st.info("ℹ️ لا يوجد جامعات مسجلة حتى الآن.")
-
+        
+        # 🔥 استخدام cache للحفاظ على استقرار الجدول
+        def load_universities_data():
+            return get_universities()
+            
+        try:
+            df = load_universities_data()
+            if not df.empty:
+                # 🔥 إضافة search filter للجامعات
+                search_term = st.text_input("🔍 بحث باسم الجامعة:", key="uni_search")
+                
+                if search_term:
+                    filtered_df = df[df['name'].str.contains(search_term, case=False, na=False)]
+                else:
+                    filtered_df = df
+                
+                # عرض الجدول
+                st.dataframe(filtered_df, use_container_width=True)
+                
+                # 🔥 إحصائيات
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("عدد الجامعات", len(filtered_df))
+                with col2:
+                    locations_count = filtered_df['location'].nunique()
+                    st.metric("عدد المواقع", locations_count)
+                with col3:
+                    if st.button("🔄 تحديث البيانات", key="refresh_unis"):
+                        st.cache_data.clear()
+                        st.rerun()
+                        
+            else:
+                st.info("ℹ️ لا يوجد جامعات مسجلة حتى الآن.")
+        except Exception as e:
+            st.error(f"❌ خطأ في تحميل البيانات: {e}")
 # ---------------------------
 # صفحة إدارة الكورسات
 # ---------------------------
