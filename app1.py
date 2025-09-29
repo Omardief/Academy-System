@@ -412,17 +412,17 @@ def allocate_payment_sequential_exact(courses, payment):
     return allocations, leftover
 
 
-def metric_card(title, value, color="#2A2AC2"):
+def metric_card(title, value, color="#2011DF"):  # اللون الداكن كأساسي
     st.markdown(
         f"""
         <div style="
-            background: linear-gradient(135deg, {color}, #6A0DAD);
+            background: linear-gradient(135deg, {color}, #E8E8F1);  /* تدرج بين الداكن والفاتح */
             padding: 20px;
             border-radius: 15px;
             text-align: center;
-            color: white;
+            color: #2011DF;  /* نص داكن ليتضح على الخلفية الفاتحة */
             box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(32,17,223,0.2);  /* حافة بناءً على اللون الداكن */
             margin: 10px;
             ">
             <h4 style="margin:0; font-size:16px; font-weight:300;">{title}</h4>
@@ -431,7 +431,6 @@ def metric_card(title, value, color="#2A2AC2"):
         """,
         unsafe_allow_html=True
     )
-
 # ---------------------------
 # إعدادات التصميم المتطور
 # ---------------------------
@@ -609,17 +608,16 @@ logo_path = "logo.png"  # غيّر المسار ده للموقع الصحيح �
 base64_logo = get_base64_image(logo_path)
 
 def display_premium_logo():
-    # استبدال العمود بتاع اللوجو في الكود
     st.markdown(
         f"""
-        <div style="text-align: center; margin-bottom: 2rem; padding: 2rem; background: linear-gradient(135deg, #8A2BE2, #6A0DAD); border-radius: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);">
+        <div style="text-align: center; margin-bottom: 2rem; padding: 2rem; background: linear-gradient(135deg, #2011DF, #E8E8F1); border-radius: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);">
             <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
-                <div style="background: white; border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); overflow: hidden;">
+                <div style="background: #E8E8F1; border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); overflow: hidden;">
                     <img src="data:image/png;base64,{base64_logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;">
                 </div>
                 <div>
-                    <h1 style="color: white; font-size: 3.5rem; margin: 0; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Pioneer Academy</h1>
-                    <p style="color: rgba(255,255,255,0.9); font-size: 1.3rem; margin: 0; font-weight: 300;"> Expert Coding, Pioneered   </p>
+                    <h1 style="color: #2011DF; font-size: 3.5rem; margin: 0; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Pioneer Academy</h1>
+                    <p style="color: rgba(32,17,223,0.9); font-size: 1.3rem; margin: 0; font-weight: 300;"> Expert Coding, Pioneered   </p>
                 </div>
             </div>
         </div>
