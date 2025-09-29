@@ -616,8 +616,8 @@ def display_premium_logo():
                     <img src="data:image/png;base64,{base64_logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;">
                 </div>
                 <div>
-                    <h1 style="color: #2011DF; font-size: 3.5rem; margin: 0; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Pioneer Academy</h1>
-                    <p style="color: rgba(32,17,223,0.9); font-size: 1.3rem; margin: 0; font-weight: 300;"> Expert Coding, Pioneered   </p>
+                    <h1 style="color: #E8E8F1; font-size: 3.5rem; margin: 0; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Pioneer Academy</h1>
+                    <p style="color: E8E8F1; font-size: 1.3rem; margin: 0; font-weight: 300;"> Expert Coding, Pioneered   </p>
                 </div>
             </div>
         </div>
