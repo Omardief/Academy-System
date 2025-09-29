@@ -162,10 +162,11 @@ def add_student(name, phone, gmail, university_id, department, commission=None):
 
 def get_students():
     try:
-        response = supabase.table("students").select("id, name, phone, gmail, department, universities(name)").execute()
+        # 🔥 إضافة commission للـ select
+        response = supabase.table("students").select("id, name, phone, gmail, department, commission, universities(name)").execute()
         
         if not response.data:
-            return pd.DataFrame(columns=["id", "name", "phone", "gmail", "department", "university"])
+            return pd.DataFrame(columns=["id", "name", "phone", "gmail", "department", "commission", "university"])
 
         df = pd.DataFrame(response.data)
 
@@ -173,7 +174,8 @@ def get_students():
             df["university"] = df["universities"].apply(lambda x: x.get("name") if isinstance(x, dict) else (x if isinstance(x, str) else None))
             df = df.drop(columns=["universities"])
 
-        cols = ["id", "name", "phone", "gmail", "department", "university"]
+        # 🔥 إضافة commission للقائمة
+        cols = ["id", "name", "phone", "gmail", "department", "commission", "university"]
         for c in cols:
             if c not in df.columns:
                 df[c] = None
@@ -181,19 +183,20 @@ def get_students():
         
     except Exception as e:
         st.error(f"Error fetching students: {e}")
-        return pd.DataFrame(columns=["id", "name", "phone", "gmail", "department", "university"])
+        return pd.DataFrame(columns=["id", "name", "phone", "gmail", "department", "commission", "university"])
 # ---------------------------
 # دوال مساعدة للتسجيل
 # ---------------------------
 def get_students_by_university(university_id):
     try:
-        resp = supabase.table("students").select("id, name, phone, gmail, department").eq("university_id", int(university_id)).execute()
+        # 🔥 إضافة commission هنا كمان
+        resp = supabase.table("students").select("id, name, phone, gmail, department, commission").eq("university_id", int(university_id)).execute()
         if resp.data:
             return pd.DataFrame(resp.data)
-        return pd.DataFrame(columns=["id","name","phone","gmail","department"])
+        return pd.DataFrame(columns=["id","name","phone","gmail","department","commission"])
     except Exception as e:
         st.error(f"Error fetching students by university: {e}")
-        return pd.DataFrame(columns=["id","name","phone","gmail","department"])
+        return pd.DataFrame(columns=["id","name","phone","gmail","department","commission"])
 
 def get_courses_by_university(university_id):
     try:
