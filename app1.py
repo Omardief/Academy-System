@@ -1748,8 +1748,6 @@ elif page == "تسجيل دفعة":
                         st.markdown("### 📋 تفاصيل الطلاب اللي عليهم باقي")
                         st.dataframe(display_df, use_container_width=True)
 
-        except Exception as e:
-            st.error(f"❌ خطأ عام: {e}")
 
     with tab5:
         st.markdown('<div class="section-header">💵 تسجيل دفعة جديدة</div>', unsafe_allow_html=True)
