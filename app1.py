@@ -711,7 +711,8 @@ elif st.session_state.role == "pioneer_secretary":
     filtered_page_options = {
         "🏫 Pioneer": [
             "إدارة الطلاب",
-            "تسجيل دفعة"
+            "تسجيل دفعة",
+            "Welcome"
         ],
         "📚 Pioneer Private": [
             "Registration"
