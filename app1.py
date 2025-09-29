@@ -440,7 +440,7 @@ def set_premium_style():
     /* تخصيص عام */
     .main-header {
         font-size: 2.8rem;
-        background: linear-gradient(135deg, #8A2BE2, #6A0DAD);
+        background: linear-gradient(135deg, #2011DF, #E8E8F1);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-align: center;
@@ -451,40 +451,40 @@ def set_premium_style():
     
     .section-header {
         font-size: 1.8rem;
-        color: #8A2BE2;
+        color: #2011DF;
         margin-top: 1.5rem;
         margin-bottom: 1rem;
-        border-bottom: 3px solid #8A2BE2;
+        border-bottom: 3px solid #2011DF;
         padding-bottom: 0.5rem;
         font-weight: 600;
     }
     
     /* تخصيص الخلفية */
     .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        background: linear-gradient(135deg, #E8E8F1 0%, #DCDCE5 100%); /* درجة فاتحة من #E8E8F1 */
     }
     
     /* تخصيص الأزرار */
     .stButton>button {
-        background: linear-gradient(135deg, #8A2BE2, #6A0DAD);
+        background: linear-gradient(135deg, #2011DF, #E8E8F1);
         color: white;
         border-radius: 12px;
         border: none;
         padding: 0.7rem 1.5rem;
         font-weight: 600;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 8px rgba(138, 43, 226, 0.3);
+        box-shadow: 0 4px 8px rgba(32,17,223,0.3);
     }
     
     .stButton>button:hover {
-        background: linear-gradient(135deg, #6A0DAD, #8A2BE2);
+        background: linear-gradient(135deg, #E8E8F1, #2011DF);
         transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(138, 43, 226, 0.4);
+        box-shadow: 0 6px 12px rgba(32,17,223,0.4);
     }
     
     /* تخصيص الأختيارات */
     .stSelectbox>div>div>div {
-        color: #8A2BE2;
+        color: #2011DF;
         font-weight: 600;
     }
     
@@ -493,7 +493,7 @@ def set_premium_style():
         border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-        border: 1px solid rgba(138, 43, 226, 0.1);
+        border: 1px solid rgba(32,17,223,0.1);
     }
     
     /* تخصيص التبويبات */
@@ -504,38 +504,38 @@ def set_premium_style():
     .stTabs [data-baseweb="tab"] {
         height: 60px;
         white-space: pre-wrap;
-        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        background: linear-gradient(135deg, #E8E8F1, #F0F0F7);
         border-radius: 12px 12px 0 0;
         gap: 8px;
         padding: 15px 20px;
         font-weight: 600;
-        border: 1px solid rgba(138, 43, 226, 0.1);
+        border: 1px solid rgba(32,17,223,0.1);
         margin: 2px;
     }
     
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #8A2BE2, #6A0DAD);
+        background: linear-gradient(135deg, #2011DF, #E8E8F1);
         color: white;
-        box-shadow: 0 4px 8px rgba(138, 43, 226, 0.3);
+        box-shadow: 0 4px 8px rgba(32,17,223,0.3);
     }
     
     /* تخصيص الأرقام */
     .stNumberInput>div>div>input {
-        border: 2px solid #8A2BE2;
+        border: 2px solid #2011DF;
         border-radius: 10px;
-        background: rgba(138, 43, 226, 0.05);
+        background: rgba(32,17,223,0.05);
     }
     
     /* تخصيص النصوص */
     .stTextInput>div>div>input {
-        border: 2px solid #8A2BE2;
+        border: 2px solid #2011DF;
         border-radius: 10px;
-        background: rgba(138, 43, 226, 0.05);
+        background: rgba(32,17,223,0.05);
     }
     
     /* تخصيص الشريط الجانبي */
     .css-1d391kg {
-        background: linear-gradient(180deg, #8A2BE2 0%, #6A0DAD 100%);
+        background: linear-gradient(180deg, #2011DF 0%, #E8E8F1 100%);
         box-shadow: 4px 0 12px rgba(0,0,0,0.1);
     }
     
@@ -546,7 +546,7 @@ def set_premium_style():
     }
     
     .stRadio>div {
-        background: rgba(255,255,255,0.9);
+        background: rgba(232,232,241,0.9); /* درجة من #E8E8F1 */
         padding: 15px;
         border-radius: 12px;
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
@@ -556,45 +556,44 @@ def set_premium_style():
     .js-plotly-plot .plotly {
         border-radius: 12px;
         box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-        background: white;
+        background: #E8E8F1;
     }
     
     /* تخصيص البطاقات */
     .card {
-        background: linear-gradient(135deg, #ffffff, #f8f9fa);
+        background: linear-gradient(135deg, #E8E8F1, #F0F0F7);
         border-radius: 15px;
         padding: 20px;
         margin: 10px 0;
         box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-        border: 1px solid rgba(138, 43, 226, 0.1);
+        border: 1px solid rgba(32,17,223,0.1);
     }
     
     /* تخصيص التنبيهات */
     .stAlert {
         border-radius: 12px;
-        border-left: 5px solid #8A2BE2;
+        border-left: 5px solid #2011DF;
     }
     
     /* تخصيص النجاح */
     .stSuccess {
-        background: linear-gradient(135deg, #d4edda, #c3e6cb);
-        border-left: 5px solid #28a745;
+        background: linear-gradient(135deg, #E8E8F1, #DCDCE5); /* درجات من #E8E8F1 */
+        border-left: 5px solid #2011DF;
     }
     
     /* تخصيص التحذيرات */
     .stWarning {
-        background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-        border-left: 5px solid #ffc107;
+        background: linear-gradient(135deg, #E8E8F1, #D0D0DD); /* درجات من #E8E8F1 */
+        border-left: 5px solid #2011DF;
     }
     
     /* تخصيص الأخطاء */
     .stError {
-        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
-        border-left: 5px solid #dc3545;
+        background: linear-gradient(135deg, #E8E8F1, #D0D0DD); /* درجات من #E8E8F1 */
+        border-left: 5px solid #2011DF;
     }
     </style>
     """, unsafe_allow_html=True)
-
 # ---------------------------
 # شعار Pioneer Academy (بديل نصي متطور)
 # ---------------------------
@@ -617,7 +616,7 @@ def display_premium_logo():
                 </div>
                 <div>
                     <h1 style="color: #E8E8F1; font-size: 3.5rem; margin: 0; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Pioneer Academy</h1>
-                    <p style="color: E8E8F1; font-size: 1.3rem; margin: 0; font-weight: 300;"> Expert Coding, Pioneered   </p>
+                    <p style="color: #E8E8F1; font-size: 1.3rem; margin: 0; font-weight: 300;"> Expert Coding, Pioneered   </p>
                 </div>
             </div>
         </div>
