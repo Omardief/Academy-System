@@ -288,7 +288,7 @@ def register_student_courses(
         if fixed_discount < 0:
             return None, "Discount amount cannot be negative"
 
-        # جلب تفاصيل الكورسات (لو مش مرر، جلب من الداتا بيز)
+        # جلب تفاصيل الكورسات
         if courses_df is None:
             resp = supabase.table("courses").select("id, name, price, before_mid, after_mid, session_price").in_("id", selected_course_ids).execute()
             courses_data, err = _handle_response(resp)
@@ -351,9 +351,12 @@ def register_student_courses(
         for idx, x in enumerate(course_amounts):
             cid = x["course_id"]
             total_fee = x["total_fee"]
-            enrolled_fee = x["enrolled_fee"]
+            enrolled_fee = x["enrolled_fee"]  # ده اللي بيكون 750 في المثال
             pay_now_for_this = pay_per_course
             current_discount = fixed_discount if payment_option == "full" else 0
+
+            # Debug: نشوف القيم قبل الإدخال
+            print(f"DEBUG - Course {cid}: total_fee={total_fee}, enrolled_fee={enrolled_fee}, discount={current_discount}")
 
             # دائمًا عمل insert جديد بدل update
             insert_row = {
@@ -361,11 +364,11 @@ def register_student_courses(
                 "course_id": int(cid),
                 "enrollment_date": datetime.date.today().isoformat(),
                 "total_fee": total_fee,
-                "enrolled_fee": enrolled_fee,
+                "enrolled_fee": enrolled_fee,  # المفروض يخش 750
                 "payment_option": payment_option,
                 "discount": current_discount,
                 "amount_paid": 0.0,
-                "remaining_amount": enrolled_fee,
+                "remaining_amount": enrolled_fee,  # كمان ده المفروض يخش 750
                 "created_at": datetime.datetime.utcnow().isoformat() + "Z",
                 "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
             }
@@ -376,6 +379,9 @@ def register_student_courses(
                 return None, f"Failed to create registration: {ins_err}"
             
             sc_id = int(ins_data[0]["id"])
+
+            # Debug: نشوف اللي اتسجل في الداتابيز
+            print(f"DEBUG - Inserted record: {ins_data[0]}")
 
             # تسجيل الدفعة الأولى إذا وجدت
             if pay_now_for_this > 0:
@@ -392,7 +398,7 @@ def register_student_courses(
                 new_paid = pay_now_for_this
                 new_remaining = max(enrolled_fee - new_paid, 0)
                 
-                # تحديث المبالغ بعد الدفع
+                # تحديث المبالغ بعد الدفع - نتأكد إن enrolled_fee مش بيتغير
                 upd2 = supabase.table("student_courses").update({
                     "amount_paid": new_paid,
                     "remaining_amount": new_remaining,
@@ -401,6 +407,11 @@ def register_student_courses(
                 _, uerr2 = _handle_response(upd2)
                 if uerr2:
                     return None, f"Error updating after payment: {uerr2}"
+
+                # Debug: نشوف بعد التحديث
+                check_resp = supabase.table("student_courses").select("*").eq("id", sc_id).execute()
+                if check_resp.data:
+                    print(f"DEBUG - After payment update: {check_resp.data[0]}")
 
                 results.append({
                     "course_id": cid,
