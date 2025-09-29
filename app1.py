@@ -412,21 +412,27 @@ def allocate_payment_sequential_exact(courses, payment):
     return allocations, leftover
 
 
-def metric_card(title, value, color="#2011DF"):  # اللون الداكن كأساسي
+def metric_card(title, value, color="#2011DF"):
     st.markdown(
         f"""
         <div style="
-            background: linear-gradient(135deg, {color}, #E8E8F1);  /* تدرج بين الداكن والفاتح */
-            padding: 20px;
-            border-radius: 15px;
+            background: linear-gradient(135deg, {color}, #E8E8F1);
+            padding: 25px;
+            border-radius: 20px;
             text-align: center;
-            color: #2011DF;  /* نص داكن ليتضح على الخلفية الفاتحة */
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-            border: 1px solid rgba(32,17,223,0.2);  /* حافة بناءً على اللون الداكن */
-            margin: 10px;
+            color: #2011DF;
+            box-shadow: 0 12px 24px rgba(32, 17, 223, 0.15), 0 6px 12px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(32, 17, 223, 0.1);
+            margin: 15px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            overflow: hidden;
             ">
-            <h4 style="margin:0; font-size:16px; font-weight:300;">{title}</h4>
-            <h2 style="margin:0; font-size:32px; font-weight:700;">{value}</h2>
+            <h4 style="margin: 0 0 10px 0; font-size: 18px; font-weight: 400; text-transform: uppercase; letter-spacing: 1px; color: rgba(32, 17, 223, 0.8);">
+                {title}
+            </h4>
+            <h2 style="margin: 0; font-size: 36px; font-weight: 800; color: #2011DF; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);">
+                {value}
+            </h2>
         </div>
         """,
         unsafe_allow_html=True
@@ -729,8 +735,8 @@ with st.sidebar:
             <div style="background: #E8E8F1; border-radius: 50%; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); overflow: hidden;">
                 <img src="data:image/png;base64,{base64_logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;">
             </div>
-            <h3 style="color: #2011DF; margin: 0; font-weight: 700;">Pioneer Academy</h3>
-            <p style="color: rgba(32,17,223,0.9); margin: 0; font-size: 0.9rem;">Management System</p>
+            <h3 style="color: #E8E8F1; margin: 0; font-weight: 700;">Pioneer Academy</h3>
+            <p style="color: #E8E8F1; margin: 0; font-size: 0.9rem;">Management System</p>
         </div>
         """,
         unsafe_allow_html=True
