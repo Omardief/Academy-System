@@ -1685,19 +1685,7 @@ elif page == "تسجيل دفعة":
                         suffixes=("", "_course")
                     )
 
-                    # إحصائيات
-                    num_students = merged["student_id"].nunique()
-                    total_remaining = merged["remaining_amount"].sum()
-
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        metric_card("👥 عدد الطلاب اللي باقي عليهم", num_students, "#2196F3")
-                    with col2:
-                        metric_card("💰 إجمالي المبلغ الباقي", f"{total_remaining:,.2f} جنيه", "#4CAF50")
-
-                    st.markdown("---")
-
-                    # 🔥 إضافة key فريد للفلاتر
+                    # فلاتر إضافية
                     col3, col4 = st.columns(2)
                     with col3:
                         # فلتر الكورسات
@@ -1717,20 +1705,34 @@ elif page == "تسجيل دفعة":
                         )
 
                     # تطبيق الفلاتر
+                    filtered_df = merged.copy()
                     if selected_course != "الكل":
-                        merged = merged[merged["name_course"] == selected_course]
+                        filtered_df = filtered_df[filtered_df["name_course"] == selected_course]
                     if selected_student != "الكل":
                         student_name, student_phone = selected_student.split(" — ")
-                        merged = merged[
-                            (merged["name"] == student_name) & 
-                            (merged["phone"] == student_phone)
+                        filtered_df = filtered_df[
+                            (filtered_df["name"] == student_name) & 
+                            (filtered_df["phone"] == student_phone)
                         ]
 
-                    if merged.empty:
+                    if filtered_df.empty:
                         st.info("📭 لا توجد بيانات بعد تطبيق الفلاتر.")
                     else:
+                        # حساب الإحصائيات بعد الفلاتر
+                        num_students = filtered_df["student_id"].nunique()
+                        total_remaining = filtered_df["remaining_amount"].sum()
+
+                        # عرض الكاردات
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            metric_card("👥 عدد الطلاب اللي باقي عليهم", num_students, "#2196F3")
+                        with col2:
+                            metric_card("💰 إجمالي المبلغ الباقي", f"{total_remaining:,.2f} جنيه", "#4CAF50")
+
+                        st.markdown("---")
+
                         # عرض الجدول
-                        display_df = merged[[
+                        display_df = filtered_df[[
                             "name", "phone", "name_course", "payment_option",
                             "amount_paid", "remaining_amount", "created_at"
                         ]].rename(columns={
@@ -1745,6 +1747,9 @@ elif page == "تسجيل دفعة":
 
                         st.markdown("### 📋 تفاصيل الطلاب اللي عليهم باقي")
                         st.dataframe(display_df, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"❌ خطأ عام: {e}")
 
     with tab5:
         st.markdown('<div class="section-header">💵 تسجيل دفعة جديدة</div>', unsafe_allow_html=True)
