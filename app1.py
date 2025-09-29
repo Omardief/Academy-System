@@ -270,105 +270,43 @@ def _handle_response(resp):
     except Exception as e:
         return None, str(e)
 
-def register_student_courses(
+def register_student_courses_simple(
     student_id,
-    selected_course_ids,
+    course_details,  # list of dicts مع كل التفاصيل المحسوبة مسبقاً
     payment_option,
-    initial_payment=0.0,
-    payment_method="cash",
-    fixed_discount=0,
-    courses_df=None
+    payment_method="cash"
 ):
+    """
+    دالة مبسطة لتسجيل الطالب في الكورسات - تقوم بالإدخال فقط
+    course_details: list of dictionaries تحتوي على:
+        - course_id
+        - course_name
+        - total_fee
+        - enrolled_fee
+        - discount
+        - payment_for_course
+    """
     try:
-        # التحقق من الإدخال
-        if not selected_course_ids:
-            return None, "No courses selected"
-        if initial_payment < 0:
-            return None, "Initial payment cannot be negative"
-        if fixed_discount < 0:
-            return None, "Discount amount cannot be negative"
-
-        # جلب تفاصيل الكورسات
-        if courses_df is None:
-            resp = supabase.table("courses").select("id, name, price, before_mid, after_mid, session_price").in_("id", selected_course_ids).execute()
-            courses_data, err = _handle_response(resp)
-            if err:
-                return None, f"Error fetching courses: {err}"
-            if not courses_data:
-                return None, "Selected courses not found"
-            courses_df = pd.DataFrame(courses_data)
-
-        # حساب total_fee و enrolled_fee
-        course_amounts = []
-        total_before_discount = 0.0
-        for cid in selected_course_ids:
-            row = courses_df[courses_df["id"] == cid].iloc[0]
-            price = float(row.get("price", 0))
-            before_mid = float(row.get("before_mid", 0))
-            after_mid = float(row.get("after_mid", 0))
-            session_price = float(row.get("session_price", 0))
-
-            if payment_option == "full":
-                total_fee = price
-            elif payment_option == "before_mid":
-                total_fee = before_mid
-            elif payment_option == "after_mid":
-                total_fee = after_mid
-            elif payment_option == "one_session":
-                total_fee = session_price
-            else:
-                total_fee = price
-
-            total_before_discount += total_fee
-            course_amounts.append({
-                "course_id": cid,
-                "course_name": row.get("name", ""),
-                "total_fee": total_fee
-            })
-
-        # حساب الخصم الجديد (فقط لو full)
-        discount_amount = 0.0
-        if payment_option == "full":
-            discount_amount = fixed_discount
-
-        total_after_discount = total_before_discount - discount_amount
-        if total_after_discount < 0:
-            total_after_discount = 0
-
-        # توزيع total_after_discount بالتساوي على الكورسات لـ enrolled_fee - بدون تقريب
-        num_courses = len(course_amounts)
-        per_course_amount = total_after_discount / num_courses if num_courses > 0 else 0
-
-        # تحديث course_amounts بـ enrolled_fee
-        for x in course_amounts:
-            x["enrolled_fee"] = per_course_amount
-
-        # توزيع initial_payment بالتساوي على الكورسات - بدون تقريب
-        pay_per_course = initial_payment / num_courses if num_courses > 0 and initial_payment > 0 else 0
-
-        # معالجة كل كورس - دائمًا عمل insert جديد
         results = []
-        for idx, x in enumerate(course_amounts):
-            cid = x["course_id"]
-            total_fee = x["total_fee"]
-            enrolled_fee = x["enrolled_fee"]  # ده اللي بيكون 750 في المثال
-            pay_now_for_this = pay_per_course
-            current_discount = fixed_discount if payment_option == "full" else 0
-
-            # Debug: نشوف القيم قبل الإدخال
-            print(f"DEBUG - Course {cid}: total_fee={total_fee}, enrolled_fee={enrolled_fee}, discount={current_discount}")
-
-            # دائمًا عمل insert جديد بدل update
+        
+        for course in course_details:
+            cid = course["course_id"]
+            total_fee = course["total_fee"]
+            enrolled_fee = course["enrolled_fee"]
+            discount = course["discount"]
+            payment_for_course = course["payment_for_course"]
+            
+            # إدخال تسجيل الطالب في الكورس
             insert_row = {
                 "student_id": int(student_id),
                 "course_id": int(cid),
                 "enrollment_date": datetime.date.today().isoformat(),
                 "total_fee": total_fee,
-                "enrolled_fee": enrolled_fee,  # المفروض يخش 750
+                "enrolled_fee": enrolled_fee,
                 "payment_option": payment_option,
-                "discount": current_discount,
-                "amount_paid": 0.0,
-                "remaining_amount": enrolled_fee,  # كمان ده المفروض يخش 750
+                "discount": discount,
+                "amount_paid": 0.0,  # سيتم تحديثها بعد إدخال الدفعة
+                "remaining_amount": enrolled_fee,
                 "created_at": datetime.datetime.utcnow().isoformat() + "Z",
                 "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
             }
@@ -376,29 +314,26 @@ def register_student_courses(
             ins_resp = supabase.table("student_courses").insert(insert_row).execute()
             ins_data, ins_err = _handle_response(ins_resp)
             if ins_err or not ins_data:
-                return None, f"Failed to create registration: {ins_err}"
+                return None, f"Failed to create registration for course {cid}: {ins_err}"
             
             sc_id = int(ins_data[0]["id"])
-
-            # Debug: نشوف اللي اتسجل في الداتابيز
-            print(f"DEBUG - Inserted record: {ins_data[0]}")
-
-            # تسجيل الدفعة الأولى إذا وجدت
-            if pay_now_for_this > 0:
+            
+            # إذا كان هناك دفعة أولية، نسجلها
+            if payment_for_course > 0:
                 pay_resp = supabase.table("payments").insert({
                     "student_course_id": sc_id,
-                    "amount": pay_now_for_this,
+                    "amount": payment_for_course,
                     "payment_method": payment_method,
                     "paid_at": datetime.datetime.utcnow().isoformat() + "Z"
                 }).execute()
                 _, perr = _handle_response(pay_resp)
                 if perr:
-                    return None, f"Error inserting payment: {perr}"
+                    return None, f"Error inserting payment for course {cid}: {perr}"
 
-                new_paid = pay_now_for_this
-                new_remaining = max(enrolled_fee - new_paid, 0)
+                new_paid = payment_for_course
+                new_remaining = max(enrolled_fee - new_paid, 0.0)
                 
-                # تحديث المبالغ بعد الدفع - نتأكد إن enrolled_fee مش بيتغير
+                # تحديث المبالغ بعد الدفع
                 upd2 = supabase.table("student_courses").update({
                     "amount_paid": new_paid,
                     "remaining_amount": new_remaining,
@@ -406,34 +341,29 @@ def register_student_courses(
                 }).eq("id", sc_id).execute()
                 _, uerr2 = _handle_response(upd2)
                 if uerr2:
-                    return None, f"Error updating after payment: {uerr2}"
-
-                # Debug: نشوف بعد التحديث
-                check_resp = supabase.table("student_courses").select("*").eq("id", sc_id).execute()
-                if check_resp.data:
-                    print(f"DEBUG - After payment update: {check_resp.data[0]}")
+                    return None, f"Error updating after payment for course {cid}: {uerr2}"
 
                 results.append({
                     "course_id": cid,
-                    "course_name": x["course_name"],
+                    "course_name": course["course_name"],
                     "action": "created_and_paid_partial",
                     "total_fee": total_fee,
                     "enrolled_fee": enrolled_fee,
-                    "discount": current_discount,
-                    "paid_now": pay_now_for_this,
+                    "discount": discount,
+                    "paid_now": payment_for_course,
                     "amount_paid": new_paid,
                     "remaining": new_remaining
                 })
             else:
                 results.append({
                     "course_id": cid,
-                    "course_name": x["course_name"],
+                    "course_name": course["course_name"],
                     "action": "created_no_payment",
                     "total_fee": total_fee,
                     "enrolled_fee": enrolled_fee,
-                    "discount": current_discount,
-                    "paid_now": 0,
-                    "amount_paid": 0,
+                    "discount": discount,
+                    "paid_now": 0.0,
+                    "amount_paid": 0.0,
                     "remaining": enrolled_fee
                 })
 
@@ -441,7 +371,6 @@ def register_student_courses(
 
     except Exception as e:
         return None, str(e)
-
 
 def allocate_payment_sequential_exact(courses, payment):
     """
@@ -1653,16 +1582,18 @@ elif page == "إدارة الطلاب":
             initial_payment = max_possible
 
         # عرض توزيع الدفعة الأولية بالتساوي - بدون تقريب
+        base_payment = 0.0
         if initial_payment > 0 and num_courses > 0:
             base_payment = initial_payment / num_courses
+
+        # وفي عرض توزيع الدفعة الأولية
+        if initial_payment > 0 and num_courses > 0:
             st.markdown("### توزيع الدفعة الأولية")
             for i, (nm, _) in enumerate(details):
                 st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 10px; border:1px solid #ddd; border-radius:8px; margin-bottom:5px;'>"
                             f"<strong>{nm}</strong>"
                             f"<span>{base_payment:.2f} جنيه</span>"
                             f"</div>", unsafe_allow_html=True)
-
-        st.caption("لو حبيت تدفع جزء من المبلغ دلوقتي، اكتب المبلغ هنا، وسيتم توزيعه بالتساوي على الكورسات المحددة.")
 
         st.markdown("---")
         st.subheader("✅ تنفيذ التسجيل")
@@ -1673,14 +1604,50 @@ elif page == "إدارة الطلاب":
             elif not selected_course_ids:
                 st.error("❌ اختر كورس واحد على الأقل.")
             else:
-                results, err = register_student_courses(
+                        # نحسب كل التفاصيل هنا في الواجهة أولاً
+                course_details = []
+                
+                for i, cid in enumerate(selected_course_ids):
+                    row = courses_df[courses_df["id"] == cid].iloc[0]
+                    
+                    # حساب المبالغ لكل كورس
+                    price = float(row.get("price") or 0)
+                    before_mid = float(row.get("before_mid") or 0)
+                    after_mid = float(row.get("after_mid") or 0)
+                    session_price = float(row.get("session_price") or 0)
+
+                    if payment_option == "full":
+                        total_fee = price
+                    elif payment_option == "before_mid":
+                        total_fee = before_mid
+                    elif payment_option == "after_mid":
+                        total_fee = after_mid
+                    elif payment_option == "one_session":
+                        total_fee = session_price
+                    else:
+                        total_fee = price
+                    
+                    # حساب enrolled_fee (نفس الحساب اللي في الواجهة)
+                    enrolled_fee = per_course_amount 
+                    
+                    # حساب الدفعة لهذا الكورس
+                    payment_for_course = base_payment if initial_payment > 0 else 0
+                    
+                    course_details.append({
+                        "course_id": cid,
+                        "course_name": row.get("name", ""),
+                        "total_fee": total_fee,
+                        "enrolled_fee": enrolled_fee,
+                        "discount": st.session_state.fixed_discount if payment_option == "full" else 0,
+                        "payment_for_course": payment_for_course
+                    })
+
+                # ندخل البيانات للداتابيز
+                results, err = register_student_courses_simple(
                     selected_student_id,
-                    selected_course_ids,
+                    course_details,
                     payment_option,
-                    initial_payment,
-                    payment_method,
-                    st.session_state.fixed_discount,  # استخدام الخصم الجديد
-                    courses_df
+                    payment_method
                 )
                 if err:
                     st.error(f"❌ خطأ أثناء التسجيل: {err}")
