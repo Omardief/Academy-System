@@ -635,10 +635,10 @@ set_premium_style()
 
 # إدارة حالة تسجيل الدخول
 if "logged_in" not in st.session_state:
-    st.session_state.logged_in = True
-    st.session_state.role = "full_admin"
-    st.session_state.username = "admin"
-    st.session_state.selected_page = "welcome"
+    st.session_state.logged_in = False
+    st.session_state.role = None
+    st.session_state.username = None
+    st.session_state.selected_page = None
 
 # صفحة تسجيل الدخول
 if not st.session_state.logged_in:
