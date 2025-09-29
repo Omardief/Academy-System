@@ -2033,9 +2033,15 @@ elif page == "Dashboard":
                 selected_course_ids = [label_to_id[label] for label in selected_course_labels]
                 sc_df = sc_df[sc_df["course_id"].isin(selected_course_ids)]
 
+            # --- فلتر طريقة الدفع ---
+            pay_methods = ["الكل"] + sc_df["payment_method"].dropna().unique().tolist()
+            selected_pay_method = st.selectbox("💳 فلتر حسب طريقة الدفع (اختياري)", pay_methods)
+            if selected_pay_method != "الكل":
+                sc_df = sc_df[sc_df["payment_method"] == selected_pay_method]
+
             # --- فلتر التاريخ ---
             st.markdown("### 📅 فلترة حسب التاريخ")
-            sc_df["created_at"] = pd.to_datetime(sc_df["created_at"])
+            sc_df["created_at"] = pd.to_datetime(sc_df["created_at"], utc=True)
             col1, col2 = st.columns(2)
             with col1:
                 start_date = st.date_input("من تاريخ", value=sc_df["created_at"].min().date())
@@ -2125,8 +2131,13 @@ elif page == "Dashboard":
 
                 # 📈 رسم بياني خطي لعدد الطلاب المسجلين حسب التاريخ
                 st.markdown("### 📈 عدد الطلاب المسجلين حسب التاريخ")
-                # تجميع عدد الطلاب الفريدين حسب تاريخ التسجيل (يوميًا)
+                time_group = st.selectbox("اختر الفترة الزمنية", ["يومي", "أسبوعي", "شهري"], key="time_group")
                 sc_df["registration_date"] = sc_df["created_at"].dt.date
+                if time_group == "أسبوعي":
+                    sc_df["registration_date"] = sc_df["created_at"].dt.to_period("W").apply(lambda r: r.start_time.date())
+                elif time_group == "شهري":
+                    sc_df["registration_date"] = sc_df["created_at"].dt.to_period("M").apply(lambda r: r.start_time.date())
+
                 students_per_date = sc_df.groupby("registration_date")["student_id"].nunique().reset_index()
                 students_per_date.columns = ["التاريخ", "عدد الطلاب"]
 
@@ -2135,7 +2146,7 @@ elif page == "Dashboard":
                         students_per_date,
                         x="التاريخ",
                         y="عدد الطلاب",
-                        title="📈 عدد الطلاب المسجلين يوميًا",
+                        title="📈 عدد الطلاب المسجلين حسب التاريخ",
                         markers=True,
                         color_discrete_sequence=["#2196F3"]
                     )
@@ -2169,5 +2180,13 @@ elif page == "Dashboard":
 
                 st.markdown("### 📋 تفاصيل التسجيلات")
                 st.dataframe(display_df, use_container_width=True)
-else:
+
+                # --- زر تصدير كـCSV ---
+                csv = display_df.to_csv(index=False)
+                st.download_button(
+                    label="📥 تصدير كـCSV",
+                    data=csv,
+                    file_name=f"dashboard_data_{uni_name}_{start_date}_to_{end_date}.csv",
+                    mime="text/csv"
+                )
     st.error("⚠️ الرجاء اختيار صفحة صالحة.")
