@@ -599,20 +599,33 @@ def set_premium_style():
 # ---------------------------
 # شعار Pioneer Academy (بديل نصي متطور)
 # ---------------------------
+
+def get_base64_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode()
+
+# مثال لاستخدام اللوجو (استبدل 'logo.png' بمسار الصورة الحقيقي)
+logo_path = "logo.png"  # غيّر المسار ده للموقع الصحيح للوجو
+base64_logo = get_base64_image(logo_path)
+
 def display_premium_logo():
-    st.markdown("""
-    <div style="text-align: center; margin-bottom: 2rem; padding: 2rem; background: linear-gradient(135deg, #8A2BE2, #6A0DAD); border-radius: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);">
-        <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
-            <div style="background: white; border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-                <span style="font-size: 2.5rem; color: #8A2BE2; font-weight: bold;">🎓</span>
-            </div>
-            <div>
-                <h1 style="color: white; font-size: 3.5rem; margin: 0; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Pioneer Academy</h1>
-                <p style="color: rgba(255,255,255,0.9); font-size: 1.3rem; margin: 0; font-weight: 300;"> Expert Coding, Pioneered   </p>
+    # استبدال العمود بتاع اللوجو في الكود
+    st.markdown(
+        f"""
+        <div style="text-align: center; margin-bottom: 2rem; padding: 2rem; background: linear-gradient(135deg, #8A2BE2, #6A0DAD); border-radius: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
+                <div style="background: white; border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); overflow: hidden;">
+                    <img src="data:image/png;base64,{base64_logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+                <div>
+                    <h1 style="color: white; font-size: 3.5rem; margin: 0; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Pioneer Academy</h1>
+                    <p style="color: rgba(255,255,255,0.9); font-size: 1.3rem; margin: 0; font-weight: 300;"> Expert Coding, Pioneered   </p>
+                </div>
             </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True
+    )
 
 
 set_premium_style()
@@ -2062,7 +2075,7 @@ elif page == "Dashboard":
 
             # فلترة البيانات بناءً على التاريخ
             sc_df = sc_df[(sc_df["created_at"].dt.date >= start_date) & (sc_df["created_at"].dt.date <= end_date)]
-            
+
             if sc_df.empty:
                 st.warning("⚠️ لا توجد بيانات في الفترة المختارة")
             else:
