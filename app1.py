@@ -1322,54 +1322,143 @@ elif page == "إدارة الطلاب":
             st.warning("⚠️ لا توجد جامعات مضافة بعد. قم بإضافة جامعة أولًا.")
         else:
             st.markdown('<div class="section-header">👨‍🎓 إضافة طالب جديد</div>', unsafe_allow_html=True)
+            
+            # 🔥 استخدام session state لمنع الإرسال المكرر
+            if 'student_submitted' not in st.session_state:
+                st.session_state.student_submitted = False
+                
             with st.form("add_student_form", clear_on_submit=True):
                 col1, col2 = st.columns(2)
                 with col1:
-                    name = st.text_input("اسم الطالب")
+                    name = st.text_input("اسم الطالب", key="student_name")
                 with col2:
-                    phone = st.text_input("📞 رقم الهاتف")
+                    phone = st.text_input("📞 رقم الهاتف", key="student_phone")
 
                 col3, col4 = st.columns(2)
                 with col3:
-                    gmail = st.text_input("📧 Gmail")
+                    gmail = st.text_input("📧 Gmail", key="student_gmail")
                 with col4:
-                    department = st.text_input("🏷️ القسم")
+                    department = st.text_input("🏷️ القسم", key="student_department")
 
-                # اختيار الجامعة
-                university_name = st.selectbox("🏫 اختر الجامعة", universities_df["name"].tolist())
-                university_id = universities_df.loc[universities_df["name"] == university_name, "id"].values[0]
+                col5, col6 = st.columns(2)
+                with col5:
+                    # اختيار الجامعة
+                    university_name = st.selectbox(
+                        "🏫 اختر الجامعة", 
+                        universities_df["name"].tolist(),
+                        key="student_university"
+                    )
+                    university_id = universities_df.loc[universities_df["name"] == university_name, "id"].values[0]
+                
+                with col6:
+                    # 🔥 اختيار الـ commission
+                    commission_options = ["", "Menna", "Mariem", "Malak", "Salma", "Pioneer"]
+                    commission = st.selectbox(
+                        "👥  Sales ", 
+                        commission_options,
+                        key="student_commission"
+                    )
 
                 submit_student = st.form_submit_button("✅ حفظ الطالب")
 
                 if submit_student:
                     if name.strip() == "" or gmail.strip() == "" or department.strip() == "":
                         st.error("❌ من فضلك أدخل كل البيانات المطلوبة (الاسم، الـ Gmail، والقسم)")
+                    elif phone.strip() == "":
+                        st.error("❌ من فضلك أدخل رقم الهاتف")
                     else:
-                        data, error = add_student(name, phone, gmail, university_id, department)
-                        if error:
-                            st.error(f"❌ خطأ: {error}")
+                        # 🔥 التحقق من صحة رقم الهاتف
+                        if not phone.replace(' ', '').replace('-', '').replace('+', '').isdigit():
+                            st.error("❌ رقم الهاتف يجب أن يحتوي على أرقام فقط")
                         else:
-                            st.success("✅ تم إضافة الطالب بنجاح")
+                            data, error = add_student(name, phone, gmail, university_id, department, commission)
+                            if error:
+                                if "رقم الهاتف مسجل" in error:
+                                    st.error("❌ رقم الهاتف مسجل بالفعل لطالب آخر")
+                                else:
+                                    st.error(f"❌ خطأ: {error}")
+                            else:
+                                st.success("✅ تم إضافة الطالب بنجاح")
+                                st.session_state.student_submitted = True
+                                
+            # 🔥 عرض رسالة النجاح بدون استخدام rerun
+            if st.session_state.get('student_submitted', False):
+                st.info("✅ تمت إضافة الطالب بنجاح. يمكنك إضافة طالب جديد أو الانتقال إلى تبويب العرض.")
+                if st.button("إضافة طالب آخر"):
+                    st.session_state.student_submitted = False
+                    st.rerun()
 
     with tab2:
         st.markdown('<div class="section-header">📋 قائمة الطلاب</div>', unsafe_allow_html=True)
-        students_df = get_students()
-        if not students_df.empty:
-            # جلب قائمة الجامعات الموجودة في البيانات
-            universities = students_df["university"].dropna().unique().tolist()
+        
+        @st.cache_data(ttl=60)
+        def load_students_data():
+            return get_students()
+            
+        try:
+            students_df = load_students_data()
+            if not students_df.empty:
+                # فلتر الجامعات
+                universities = students_df["university"].dropna().unique().tolist()
+                selected_uni = st.selectbox(
+                    "🎓 اختر الجامعة", 
+                    ["الكل"] + universities,
+                    key="view_students_uni"
+                )
 
-            # إضافة خيار "الكل"
-            selected_uni = st.selectbox("🎓 اختر الجامعة", ["الكل"] + universities)
+                # 🔥 فلتر الـ commission
+                commissions = students_df["commission"].dropna().unique().tolist()
+                selected_commission = st.selectbox(
+                    "👥 فلتر حسب المسوق", 
+                    ["الكل"] + commissions,
+                    key="view_students_commission"
+                )
 
-            # فلترة بناءً على الاختيار
-            if selected_uni != "الكل":
-                students_df = students_df[students_df["university"] == selected_uni]
+                # 🔥 بحث بالاسم أو رقم الهاتف
+                search_term = st.text_input("🔍 بحث بالاسم أو رقم الهاتف:", key="student_search")
 
-            # عرض البيانات
-            st.dataframe(students_df, use_container_width=True)
+                # تطبيق الفلاتر
+                filtered_df = students_df.copy()
+                if selected_uni != "الكل":
+                    filtered_df = filtered_df[filtered_df["university"] == selected_uni]
+                if selected_commission != "الكل":
+                    filtered_df = filtered_df[filtered_df["commission"] == selected_commission]
+                if search_term:
+                    filtered_df = filtered_df[
+                        filtered_df["name"].str.contains(search_term, case=False, na=False) |
+                        filtered_df["phone"].str.contains(search_term, case=False, na=False)
+                    ]
 
-        else:
-            st.info("ℹ️ لا يوجد طلاب مسجلين حتى الآن.")
+                if filtered_df.empty:
+                    st.info("📭 لا توجد نتائج تطابق معايير البحث.")
+                else:
+                    # إحصائيات
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("عدد الطلاب", len(filtered_df))
+                    with col2:
+                        unique_commissions = filtered_df["commission"].nunique()
+                        st.metric("عدد المسوقين", unique_commissions)
+                    with col3:
+                        if st.button("🔄 تحديث البيانات", key="refresh_students"):
+                            st.cache_data.clear()
+                            st.rerun()
+
+                    # عرض البيانات
+                    display_df = filtered_df.rename(columns={
+                        "name": "👤 الاسم",
+                        "phone": "📞 الهاتف", 
+                        "gmail": "📧 الإيميل",
+                        "department": "🏷️ القسم",
+                        "commission": "👥 المسوق",
+                        "university": "🏫 الجامعة"
+                    })
+                    
+                    st.dataframe(display_df, use_container_width=True)
+            else:
+                st.info("ℹ️ لا يوجد طلاب مسجلين حتى الآن.")
+        except Exception as e:
+            st.error(f"❌ خطأ في تحميل البيانات: {e}")
             
     with tab3:
         st.markdown('<div class="section-header">➕ تسجيل طالب في كورسات جديدة</div>', unsafe_allow_html=True)
