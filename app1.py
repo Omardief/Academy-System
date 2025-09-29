@@ -374,28 +374,31 @@ def register_student_courses_simple(
 
 def allocate_payment_sequential_exact(courses, payment):
     """
-    توزيع الدفعة بالتساوي على الكورسات - بدون تقريب
+    توزيع الدفعة تدريجيًا على الكورسات بناءً على المتبقي، مع الجمع مع المبالغ السابقة.
+    courses: list of dicts each with keys: id, remaining_amount, amount_paid (float)
+    payment: float (the total cash user wants to pay)
+    Returns:
+      allocations: list of dicts [{"course_id": id, "alloc": x}, ...]
+      leftover: any leftover amount not allocated
     """
     allocations = []
-    remaining_payment = payment
-    num_courses = len(courses)
+    remaining_payment = float(payment)
+    courses_with_remaining = [c for c in courses if float(c.get("remaining_amount", 0) or 0) > 0]
     
-    if num_courses == 0:
+    if not courses_with_remaining:
         return allocations, remaining_payment
     
-    # توزيع الدفعة بالتساوي على الكورسات
-    base_allocation = remaining_payment / num_courses
-    
-    for i, course in enumerate(courses):
+    for course in courses_with_remaining:
         course_id = course["id"]
-        course_remaining = float(course.get("remaining_amount", 0) or 0)
+        current_remaining = float(course.get("remaining_amount", 0) or 0)
+        current_paid = float(course.get("amount_paid", 0) or 0)
         
-        # المبلغ المخصص لهذا الكورس
-        alloc_amount = base_allocation
+        if remaining_payment <= 0 or current_remaining <= 0:
+            allocations.append({"course_id": course_id, "alloc": 0.0})
+            continue
         
-        # لو المبلغ المخصص أكبر من المتبقي، نأخذ فقط المتبقي
-        if alloc_amount > course_remaining:
-            alloc_amount = course_remaining
+        # المبلغ الممكن دفعه لهذا الكورس (أقل من المتبقي أو الدفعة المتبقية)
+        alloc_amount = min(remaining_payment, current_remaining)
         
         allocations.append({
             "course_id": course_id,
@@ -404,81 +407,10 @@ def allocate_payment_sequential_exact(courses, payment):
         
         remaining_payment -= alloc_amount
     
-    # لو فضل فيه جزء من الدفعة ومفيش كورس يقبله، بنرجع الباقي
-    return allocations, remaining_payment
-
-
-def allocate_payment_sequential(student_courses, amount):
-    """
-    student_courses: list of dicts each with keys: id, remaining_amount, amount_paid (float)
-      - assumed ordered by priority (e.g. enrollment_date or id)
-    amount: float (the total cash user wants to pay) - recommended to be multiple of 50
-    
-    Returns:
-      allocations: list of dicts [{"course_id": id, "alloc": x, "was_full_paid": bool}, ...]
-      leftover: any leftover amount not allocated (normally < 50)
-    """
-    remaining_to_allocate = float(amount)
-    allocations = []
-    
-    # Defensive copy of remaining amounts
-    rems = [float(c.get("remaining_amount", 0) or 0) for c in student_courses]
-    ids = [c["id"] for c in student_courses]
-    
-    # First pass: sequential attempt to pay (full if possible, else floor to 50)
-    for idx, cid in enumerate(ids):
-        course_rem = rems[idx]
-        if remaining_to_allocate <= 0 or course_rem <= 0:
-            allocations.append({"course_id": cid, "alloc": 0.0, "was_full_paid": False})
-            continue
-
-        if remaining_to_allocate >= course_rem:
-            # we can fully pay this course (use exact remaining, even if not multiple of 50)
-            alloc = course_rem
-            was_full = True
-        else:
-            # we cannot fully pay it -> allocate floor to 50 (to avoid giving change)
-            if remaining_to_allocate >= 50:
-                alloc = floor50(remaining_to_allocate)
-                was_full = False
-                # safety: can't allocate more than course_rem
-                if alloc > course_rem:
-                    # if floor resulted bigger than course rem (rare), cap to course_rem
-                    alloc = course_rem
-                    was_full = (alloc >= course_rem - 1e-9)
-            else:
-                # remaining_to_allocate < 50 -> we don't allocate yet (try later to place small leftover)
-                alloc = 0.0
-                was_full = False
-
-        allocations.append({"course_id": cid, "alloc": round(alloc, 2), "was_full_paid": was_full})
-        remaining_to_allocate = round(remaining_to_allocate - alloc, 2)
-
-    # Second pass: try to place any small leftover (<50) into a course that can accept it
-    if remaining_to_allocate > 0:
-        # Try to find an index where remaining capacity >= leftover
-        for idx, cid in enumerate(ids):
-            course_rem = rems[idx]
-            already_alloc = allocations[idx]["alloc"]
-            capacity = round(course_rem - already_alloc, 2)
-            if capacity <= 0:
-                continue
-            # If leftover <= capacity, allocate it (even if <50) to clear it
-            if remaining_to_allocate <= capacity + 1e-9:
-                allocations[idx]["alloc"] = round(allocations[idx]["alloc"] + remaining_to_allocate, 2)
-                allocations[idx]["was_full_paid"] = allocations[idx]["was_full_paid"] or (allocations[idx]["alloc"] >= course_rem - 1e-9)
-                remaining_to_allocate = 0.0
-                break
-        # if still leftover and it's >=50, we could distribute further but that should not happen because initial amount multiple of 50
-    
-    leftover = round(remaining_to_allocate, 2)
+    # إرجاع الباقي إذا كان فيه
+    leftover = round(remaining_payment, 2)
     return allocations, leftover
 
-def round50(x):
-    return round(x / 50) * 50
-
-def floor50(x):
-    return math.floor(x / 50) * 50
 
 def metric_card(title, value, color="#2A2AC2"):
     st.markdown(
@@ -2000,13 +1932,15 @@ elif page == "تسجيل دفعة":
                                 if course_rec is None:
                                     continue
 
+                                # جمع المبلغ الجديد مع السابق
                                 new_paid = float(course_rec.get("amount_paid", 0) or 0) + amount_for_this
-                                new_remaining = max(float(course_rec.get("remaining_amount", 0) or 0) - amount_for_this, 0.0)
+                                # التريجر هيحدث remaining_amount بناءً على enrolled_fee
+                                new_remaining = max(float(course_rec.get("enrolled_fee", 0) or 0) - new_paid, 0.0)
 
                                 # update student_courses
                                 update_resp = supabase.table("student_courses").update({
                                     "amount_paid": new_paid,
-                                    "remaining_amount": new_remaining,
+                                    "remaining_amount": new_remaining,  # التريجر هيحسبها صح لو فيه تحديث
                                     "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
                                 }).eq("id", cid).execute()
                                 _, update_err = _handle_response(update_resp)
