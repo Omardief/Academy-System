@@ -2052,15 +2052,17 @@ elif page == "Dashboard":
 
             # --- فلتر التاريخ ---
             st.markdown("### 📅 فلترة حسب التاريخ")
-            sc_df["created_at"] = pd.to_datetime(sc_df["created_at"], utc=True)
+            # تحويل العمود created_at إلى datetime باستخدام ISO8601
+            sc_df["created_at"] = pd.to_datetime(sc_df["created_at"], format='ISO8601', errors='coerce')
             col1, col2 = st.columns(2)
             with col1:
-                start_date = st.date_input("من تاريخ", value=sc_df["created_at"].min().date())
+                start_date = st.date_input("من تاريخ", value=sc_df["created_at"].min().date() if not pd.isna(sc_df["created_at"].min()) else datetime.now().date())
             with col2:
-                end_date = st.date_input("إلى تاريخ", value=sc_df["created_at"].max().date())
+                end_date = st.date_input("إلى تاريخ", value=sc_df["created_at"].max().date() if not pd.isna(sc_df["created_at"].max()) else datetime.now().date())
 
+            # فلترة البيانات بناءً على التاريخ
             sc_df = sc_df[(sc_df["created_at"].dt.date >= start_date) & (sc_df["created_at"].dt.date <= end_date)]
-
+            
             if sc_df.empty:
                 st.warning("⚠️ لا توجد بيانات في الفترة المختارة")
             else:
@@ -2189,5 +2191,5 @@ elif page == "Dashboard":
                     file_name=f"dashboard_data_{uni_name}_{start_date}_to_{end_date}.csv",
                     mime="text/csv"
                 )
-
+else:
     st.error("⚠️ الرجاء اختيار صفحة صالحة.")
