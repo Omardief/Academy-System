@@ -723,15 +723,19 @@ for section, pages in filtered_page_options.items():
 # إعداد القائمة الجانبية
 with st.sidebar:
     # عرض الشعار المتميز
-    st.markdown("""
-    <div style="text-align: center; padding: 1rem; background: linear-gradient(135deg, #8A2BE2, #6A0DAD); border-radius: 15px; margin-bottom: 2rem;">
-        <div style="background: white; border-radius: 50%; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-            <span style="font-size: 2rem; color: #8A2BE2; font-weight: bold;">🎓</span>
+    st.markdown(
+        f"""
+        <div style="text-align: center; padding: 1rem; background: linear-gradient(135deg, #2011DF, #E8E8F1); border-radius: 15px; margin-bottom: 2rem;">
+            <div style="background: #E8E8F1; border-radius: 50%; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); overflow: hidden;">
+                <img src="data:image/png;base64,{base64_logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <h3 style="color: #2011DF; margin: 0; font-weight: 700;">Pioneer Academy</h3>
+            <p style="color: rgba(32,17,223,0.9); margin: 0; font-size: 0.9rem;">Management System</p>
         </div>
-        <h3 style="color: white; margin: 0; font-weight: 700;">Pioneer Academy</h3>
-        <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 0.9rem;">Management System</p>
-    </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True
+    )
+
     st.title("📂 Menu")
 
 
