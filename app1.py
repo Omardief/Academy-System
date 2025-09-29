@@ -149,15 +149,60 @@ def add_student(name, phone, gmail, university_id, department, commission=None):
         else:
             error_msg = getattr(response, 'error', None)
             if error_msg:
-                # 🔥 معالجة unique constraint error
-                if "duplicate key" in str(error_msg) or "23505" in str(error_msg):
-                    return None, "رقم الهاتف مسجل بالفعل لطالب آخر"
-                return None, str(error_msg)
+                # 🔥 معالجة unique constraint error بشكل أدق
+                error_str = str(error_msg)
+                if "duplicate key" in error_str or "23505" in error_str or "students_phone_unique" in error_str:
+                    # جلب بيانات الطالب الموجود لنفس الرقم
+                    existing_student = supabase.table("students")\
+                        .select("name, university_id")\
+                        .eq("phone", phone)\
+                        .execute()
+                    
+                    if existing_student.data:
+                        existing_name = existing_student.data[0]["name"]
+                        existing_uni_id = existing_student.data[0]["university_id"]
+                        
+                        # جلب اسم الجامعة
+                        uni_response = supabase.table("universities")\
+                            .select("name")\
+                            .eq("id", existing_uni_id)\
+                            .execute()
+                        
+                        uni_name = uni_response.data[0]["name"] if uni_response.data else "غير معروفة"
+                        
+                        return None, f"❌ رقم الهاتف {phone} مسجل بالفعل للطالب: {existing_name} في جامعة {uni_name}. استخدم رقم مختلف."
+                    else:
+                        return None, f"❌ رقم الهاتف {phone} مسجل بالفعل لطالب آخر. استخدم رقم مختلف."
+                else:
+                    return None, f"❌ خطأ في الإضافة: {error_str}"
             else:
-                return None, "Unknown error occurred"
+                return None, "❌ حدث خطأ غير معروف أثناء إضافة الطالب"
                 
     except Exception as e:
-        return None, str(e)
+        error_str = str(e)
+        if "duplicate key" in error_str or "23505" in error_str or "students_phone_unique" in error_str:
+            # نفس المعالجة في حالة ال exception
+            existing_student = supabase.table("students")\
+                .select("name, university_id")\
+                .eq("phone", phone)\
+                .execute()
+            
+            if existing_student.data:
+                existing_name = existing_student.data[0]["name"]
+                existing_uni_id = existing_student.data[0]["university_id"]
+                
+                uni_response = supabase.table("universities")\
+                    .select("name")\
+                    .eq("id", existing_uni_id)\
+                    .execute()
+                
+                uni_name = uni_response.data[0]["name"] if uni_response.data else "غير معروفة"
+                
+                return None, f"❌ رقم الهاتف {phone} مسجل بالفعل للطالب: {existing_name} في جامعة {uni_name}. استخدم رقم مختلف."
+            else:
+                return None, f"❌ رقم الهاتف {phone} مسجل بالفعل لطالب آخر. استخدم رقم مختلف."
+        else:
+            return None, f"❌ خطأ غير متوقع: {error_str}"
 
 
 def get_students():
@@ -489,6 +534,11 @@ def allocate_payment_sequential(student_courses, amount):
     leftover = round(remaining_to_allocate, 2)
     return allocations, leftover
 
+def round50(x):
+    return round(x / 50) * 50
+
+def floor50(x):
+    return math.floor(x / 50) * 50
 
 def metric_card(title, value, color="#2A2AC2"):
     st.markdown(
