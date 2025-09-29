@@ -1292,7 +1292,7 @@ elif page == "إدارة الطلاب":
                 
                 with col6:
                     # 🔥 اختيار الـ commission
-                    commission_options = ["", "Menna", "Mariem", "Malak", "Salma", "Pioneer"]
+                    commission_options = ["", "Menna", "Mariem", "Malak", "Salma", "Pioneer", "ANU"]
                     commission = st.selectbox(
                         "👥  Sales ", 
                         commission_options,
@@ -1505,7 +1505,9 @@ elif page == "إدارة الطلاب":
                 st.session_state.fixed_discount = 0
 
             # عرض تفاصيل المبلغ
+            # عرض تفاصيل المبلغ
             total = 0.0
+            course_totals = []  # list لتخزين total_fee لكل كورس
             details = []
             if selected_course_ids:
                 for cid in selected_course_ids:
@@ -1516,18 +1518,19 @@ elif page == "إدارة الطلاب":
                     session_price = float(row.get("session_price") or 0)
 
                     if payment_option == "full":
-                        amt = price
+                        total_fee = price
                     elif payment_option == "before_mid":
-                        amt = before_mid
+                        total_fee = before_mid
                     elif payment_option == "after_mid":
-                        amt = after_mid
+                        total_fee = after_mid
                     elif payment_option == "one_session":
-                        amt = session_price
+                        total_fee = session_price
                     else:
-                        amt = price
+                        total_fee = price
 
-                    details.append((row["name"], amt))
-                    total += amt
+                    course_totals.append(total_fee)
+                    details.append((row["name"], total_fee))
+                    total += total_fee
             else:
                 st.info("اختر على الأقل كورس واحد لحساب المبلغ.")
                 st.stop()
@@ -1538,20 +1541,20 @@ elif page == "إدارة الطلاب":
             if final_total < 0:
                 final_total = 0
 
-            # توزيع المبلغ النهائي بالتساوي على الكورسات - بدون تقريب
+            # تقسيم الخصم بالتساوي (لأن الأسعار متساوية)
             num_courses = len(selected_course_ids)
-            per_course_amount = 0.0
-            if num_courses > 0:
-                per_course_amount = final_total / num_courses
-
+            discount_per_course = discount_amount / num_courses if num_courses > 0 else 0
         st.markdown("---")
         st.subheader(" 💰 تفاصيل المبلغ والكورسات")
 
-        for i, (nm, amt) in enumerate(details):
-            display_amount = per_course_amount
+        for i, (nm, total_fee) in enumerate(details):
+            display_amount = total_fee - discount_per_course  # enrolled_fee للعرض
+            if display_amount < 0:
+                display_amount = 0  # منع سلبي (نادر)
+            
             st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 10px; border:1px solid #ddd; border-radius:8px; margin-bottom:5px; background-color:#f9f9f9;'>"
                         f"<strong>{nm}</strong>"
-                        f"<span>{display_amount:.2f} جنيه (السعر الأصلي: {amt:.2f})</span>"
+                        f"<span>{display_amount:.2f} جنيه (السعر الأصلي: {total_fee:.2f})</span>"
                         f"</div>", unsafe_allow_html=True)
 
         # كارت السعر قبل الخصم
@@ -1581,12 +1584,10 @@ elif page == "إدارة الطلاب":
             st.warning(f"المبلغ المدخل أكبر من الإجمالي ({max_possible:.2f}) — سيتم استخدام الحد الأقصى تلقائيًا.")
             initial_payment = max_possible
 
-        # عرض توزيع الدفعة الأولية بالتساوي - بدون تقريب
-        base_payment = 0.0
-        if initial_payment > 0 and num_courses > 0:
-            base_payment = initial_payment / num_courses
+        # تقسيم الدفعة الأولية بالتساوي
+        base_payment = initial_payment / num_courses if num_courses > 0 else 0
 
-        # وفي عرض توزيع الدفعة الأولية
+        # عرض توزيع الدفعة الأولية
         if initial_payment > 0 and num_courses > 0:
             st.markdown("### توزيع الدفعة الأولية")
             for i, (nm, _) in enumerate(details):
@@ -1594,7 +1595,6 @@ elif page == "إدارة الطلاب":
                             f"<strong>{nm}</strong>"
                             f"<span>{base_payment:.2f} جنيه</span>"
                             f"</div>", unsafe_allow_html=True)
-
         st.markdown("---")
         st.subheader("✅ تنفيذ التسجيل")
 
@@ -1628,7 +1628,9 @@ elif page == "إدارة الطلاب":
                         total_fee = price
                     
                     # حساب enrolled_fee (نفس الحساب اللي في الواجهة)
-                    enrolled_fee = per_course_amount 
+                    enrolled_fee = total_fee - discount_per_course
+                    if enrolled_fee < 0 :
+                        enrolled_fee = 0 
                     
                     # حساب الدفعة لهذا الكورس
                     payment_for_course = base_payment if initial_payment > 0 else 0
@@ -1638,7 +1640,7 @@ elif page == "إدارة الطلاب":
                         "course_name": row.get("name", ""),
                         "total_fee": total_fee,
                         "enrolled_fee": enrolled_fee,
-                        "discount": st.session_state.fixed_discount if payment_option == "full" else 0,
+                        "discount": discount_per_course if payment_option == "full" else 0,
                         "payment_for_course": payment_for_course
                     })
 
