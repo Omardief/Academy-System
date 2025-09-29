@@ -2023,6 +2023,17 @@ elif page == "Dashboard":
         else:
             sc_df = sc_df[sc_df["student_id"].isin(students_df["id"])]
 
+            # --- جلب بيانات الدفع لإضافة payment_method ---
+            pay_resp = supabase.table("payments").select("student_course_id, payment_method, paid_at").execute()
+            payments_df = pd.DataFrame(pay_resp.data) if pay_resp.data else pd.DataFrame()
+
+            if not payments_df.empty:
+                last_payments = payments_df.sort_values("paid_at").groupby("student_course_id").last().reset_index()
+                sc_df = sc_df.merge(last_payments[["student_course_id", "payment_method"]],
+                                    left_on="id", right_on="student_course_id", how="left")
+            else:
+                sc_df["payment_method"] = None
+
             # --- فلتر الكورسات ---
             course_choices = [(int(row["id"]), row["name"]) for _, row in courses_df.iterrows()]
             course_labels = [label for _id, label in course_choices]
@@ -2066,17 +2077,6 @@ elif page == "Dashboard":
                     metric_card("💰 المدفوع", f"{total_paid_uni:.2f}", "#4CAF50")
                 with c3:
                     metric_card("⌛ المتبقي", f"{total_remaining_uni:.2f}", "#FF9800")
-
-                # --- جلب بيانات الدفع ---
-                pay_resp = supabase.table("payments").select("student_course_id, payment_method, paid_at").execute()
-                payments_df = pd.DataFrame(pay_resp.data) if pay_resp.data else pd.DataFrame()
-
-                if not payments_df.empty:
-                    last_payments = payments_df.sort_values("paid_at").groupby("student_course_id").last().reset_index()
-                    sc_df = sc_df.merge(last_payments[["student_course_id", "payment_method"]],
-                                        left_on="id", right_on="student_course_id", how="left")
-                else:
-                    sc_df["payment_method"] = None
 
                 # 🔸 رسومات بيانية
                 col1, col2 = st.columns(2)
@@ -2189,4 +2189,5 @@ elif page == "Dashboard":
                     file_name=f"dashboard_data_{uni_name}_{start_date}_to_{end_date}.csv",
                     mime="text/csv"
                 )
+
     st.error("⚠️ الرجاء اختيار صفحة صالحة.")
