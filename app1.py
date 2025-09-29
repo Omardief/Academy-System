@@ -231,7 +231,7 @@ def register_student_courses(
     payment_option,
     initial_payment=0.0,
     payment_method="cash",
-    discount_percent=0,
+    fixed_discount=0,
     courses_df=None
 ):
     try:
@@ -240,8 +240,8 @@ def register_student_courses(
             return None, "No courses selected"
         if initial_payment < 0:
             return None, "Initial payment cannot be negative"
-        if discount_percent < 0 or discount_percent > 100:
-            return None, "Discount percent must be between 0 and 100"
+        if fixed_discount < 0:
+            return None, "Discount amount cannot be negative"
 
         # جلب تفاصيل الكورسات (لو مش مرر، جلب من الداتا بيز)
         if courses_df is None:
@@ -281,199 +281,105 @@ def register_student_courses(
                 "total_fee": total_fee
             })
 
-        # حساب الخصم (فقط لو full)
+        # حساب الخصم الجديد (فقط لو full)
         discount_amount = 0.0
         if payment_option == "full":
-            discount_amount = total_before_discount * discount_percent / 100
-            discount_amount = round(discount_amount / 50) * 50
+            discount_amount = fixed_discount
 
         total_after_discount = total_before_discount - discount_amount
+        if total_after_discount < 0:
+            total_after_discount = 0
 
-        # توزيع total_after_discount بالتساوي على الكورسات لـ enrolled_fee مع تقريب لأقرب 50
-        enrolled_fees_dict = {}
+        # توزيع total_after_discount بالتساوي على الكورسات لـ enrolled_fee - بدون تقريب
         num_courses = len(course_amounts)
-        if num_courses > 0:
-            # قسم المبلغ النهائي بالتساوي
-            base_enrolled_fee = total_after_discount / num_courses
-            # تقريب لأقرب 50
-            base_enrolled_fee = round(base_enrolled_fee / 50) * 50
-            # حساب الفرق الناتج عن التقريب
-            remaining_to_adjust = total_after_discount - (base_enrolled_fee * num_courses)
-            
-            for i, x in enumerate(course_amounts):
-                cid = x["course_id"]
-                enrolled_fee = base_enrolled_fee
-                # أضف الفرق لآخر كورس وتقريب لأقرب 50
-                if i == num_courses - 1:
-                    enrolled_fee += remaining_to_adjust
-                    enrolled_fee = round(enrolled_fee / 50) * 50
-                enrolled_fees_dict[cid] = enrolled_fee
+        per_course_amount = total_after_discount / num_courses if num_courses > 0 else 0
 
         # تحديث course_amounts بـ enrolled_fee
         for x in course_amounts:
-            x["enrolled_fee"] = enrolled_fees_dict[x["course_id"]]
+            x["enrolled_fee"] = per_course_amount
 
-        # توزيع initial_payment بالتساوي على الكورسات مع تقريب لأقرب 50
-        pay_distribution = []
-        if initial_payment > 0 and total_after_discount > 0:
-            initial_payment = min(initial_payment, total_after_discount)  # التأكد إن الدفعة مش أكبر من الإجمالي
-            base_payment = initial_payment / num_courses
-            # تقريب لأقرب 50
-            base_payment = round(base_payment / 50) * 50
-            # حساب الفرق الناتج عن التقريب
-            remaining_to_allocate = initial_payment - (base_payment * num_courses)
-            
-            for i, _ in enumerate(course_amounts):
-                payment = base_payment
-                # أضف الفرق لآخر كورس وتقريب لأقرب 50
-                if i == num_courses - 1:
-                    payment += remaining_to_allocate
-                    payment = round(payment / 50) * 50
-                pay_distribution.append(payment)
-        else:
-            pay_distribution = [0.0] * len(course_amounts)
+        # توزيع initial_payment بالتساوي على الكورسات - بدون تقريب
+        pay_per_course = initial_payment / num_courses if num_courses > 0 and initial_payment > 0 else 0
 
-        # معالجة كل كورس (إنشاء أو تحديث)
+        # معالجة كل كورس - دائمًا عمل insert جديد
         results = []
         for idx, x in enumerate(course_amounts):
             cid = x["course_id"]
             total_fee = x["total_fee"]
             enrolled_fee = x["enrolled_fee"]
-            pay_now_for_this = pay_distribution[idx]
-            current_discount = discount_percent if payment_option == "full" else 0
+            pay_now_for_this = pay_per_course
+            current_discount = fixed_discount if payment_option == "full" else 0
 
-            # التحقق من وجود تسجيل سابق
-            existing_resp = supabase.table("student_courses").select("*").eq("student_id", int(student_id)).eq("course_id", int(cid)).execute()
-            ex_data, ex_err = _handle_response(existing_resp)
-            if ex_err:
-                return None, f"Error checking existing registration: {ex_err}"
+            # دائمًا عمل insert جديد بدل update
+            insert_row = {
+                "student_id": int(student_id),
+                "course_id": int(cid),
+                "enrollment_date": datetime.date.today().isoformat(),
+                "total_fee": total_fee,
+                "enrolled_fee": enrolled_fee,
+                "payment_option": payment_option,
+                "discount": current_discount,
+                "amount_paid": 0.0,
+                "remaining_amount": enrolled_fee,
+                "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+                "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
+            }
+            
+            ins_resp = supabase.table("student_courses").insert(insert_row).execute()
+            ins_data, ins_err = _handle_response(ins_resp)
+            if ins_err or not ins_data:
+                return None, f"Failed to create registration: {ins_err}"
+            
+            sc_id = int(ins_data[0]["id"])
 
-            if ex_data and len(ex_data) > 0:
-                sc = ex_data[0]
-                sc_id = int(sc["id"])
+            # تسجيل الدفعة الأولى إذا وجدت
+            if pay_now_for_this > 0:
+                pay_resp = supabase.table("payments").insert({
+                    "student_course_id": sc_id,
+                    "amount": pay_now_for_this,
+                    "payment_method": payment_method,
+                    "paid_at": datetime.datetime.utcnow().isoformat() + "Z"
+                }).execute()
+                _, perr = _handle_response(pay_resp)
+                if perr:
+                    return None, f"Error inserting payment: {perr}"
 
-                # جلب المدفوعات الحالية
-                pays_resp = supabase.table("payments").select("amount").eq("student_course_id", sc_id).execute()
-                pays_data, pays_err = _handle_response(pays_resp)
-                if pays_err:
-                    return None, f"Error fetching payments: {pays_err}"
+                new_paid = pay_now_for_this
+                new_remaining = max(enrolled_fee - new_paid, 0)
                 
-                current_paid_sum = sum(float(p.get("amount") or 0) for p in (pays_data or []))
-
-                # تسجيل الدفعة الجديدة إذا وجدت
-                if pay_now_for_this > 0:
-                    pay_insert = supabase.table("payments").insert({
-                        "student_course_id": sc_id,
-                        "amount": pay_now_for_this,
-                        "payment_method": payment_method,
-                        "paid_at": datetime.datetime.utcnow().isoformat() + "Z"
-                    }).execute()
-                    _, perr = _handle_response(pay_insert)
-                    if perr:
-                        return None, f"Error inserting payment: {perr}"
-                    current_paid_sum += pay_now_for_this
-
-                new_amount_paid = round(current_paid_sum, 2)
-                new_remaining = round(max(enrolled_fee - new_amount_paid, 0), 2)
-
-                # تحديث البيانات
-                upd_resp = supabase.table("student_courses").update({
-                    "total_fee": total_fee,
-                    "enrolled_fee": enrolled_fee,
-                    "amount_paid": new_amount_paid,
+                # تحديث المبالغ بعد الدفع
+                upd2 = supabase.table("student_courses").update({
+                    "amount_paid": new_paid,
                     "remaining_amount": new_remaining,
-                    "payment_option": payment_option,
-                    "discount": current_discount,
                     "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
                 }).eq("id", sc_id).execute()
-                
-                _, uerr = _handle_response(upd_resp)
-                if uerr:
-                    return None, f"Error updating registration: {uerr}"
+                _, uerr2 = _handle_response(upd2)
+                if uerr2:
+                    return None, f"Error updating after payment: {uerr2}"
 
                 results.append({
                     "course_id": cid,
                     "course_name": x["course_name"],
-                    "action": "updated_existing",
+                    "action": "created_and_paid_partial",
                     "total_fee": total_fee,
                     "enrolled_fee": enrolled_fee,
                     "discount": current_discount,
                     "paid_now": pay_now_for_this,
-                    "new_amount_paid": new_amount_paid,
-                    "new_remaining": new_remaining
+                    "amount_paid": new_paid,
+                    "remaining": new_remaining
                 })
-
             else:
-                # تسجيل جديد
-                insert_row = {
-                    "student_id": int(student_id),
-                    "course_id": int(cid),
-                    "enrollment_date": datetime.date.today().isoformat(),
+                results.append({
+                    "course_id": cid,
+                    "course_name": x["course_name"],
+                    "action": "created_no_payment",
                     "total_fee": total_fee,
                     "enrolled_fee": enrolled_fee,
-                    "payment_option": payment_option,
                     "discount": current_discount,
-                    "amount_paid": 0.0,
-                    "remaining_amount": enrolled_fee,
-                    "created_at": datetime.datetime.utcnow().isoformat() + "Z",
-                    "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
-                }
-                
-                ins_resp = supabase.table("student_courses").insert(insert_row).execute()
-                ins_data, ins_err = _handle_response(ins_resp)
-                if ins_err or not ins_data:
-                    return None, f"Failed to create registration: {ins_err}"
-                
-                sc_id = int(ins_data[0]["id"])
-
-                # تسجيل الدفعة الأولى إذا وجدت
-                if pay_now_for_this > 0:
-                    pay_resp = supabase.table("payments").insert({
-                        "student_course_id": sc_id,
-                        "amount": pay_now_for_this,
-                        "payment_method": payment_method,
-                        "paid_at": datetime.datetime.utcnow().isoformat() + "Z"
-                    }).execute()
-                    _, perr = _handle_response(pay_resp)
-                    if perr:
-                        return None, f"Error inserting payment: {perr}"
-
-                    new_paid = pay_now_for_this
-                    new_remaining = max(enrolled_fee - new_paid, 0)
-                    
-                    # تحديث المبالغ بعد الدفع
-                    upd2 = supabase.table("student_courses").update({
-                        "amount_paid": new_paid,
-                        "remaining_amount": new_remaining,
-                        "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
-                    }).eq("id", sc_id).execute()
-                    _, uerr2 = _handle_response(upd2)
-                    if uerr2:
-                        return None, f"Error updating after payment: {uerr2}"
-
-                    results.append({
-                        "course_id": cid,
-                        "course_name": x["course_name"],
-                        "action": "created_and_paid_partial",
-                        "total_fee": total_fee,
-                        "enrolled_fee": enrolled_fee,
-                        "discount": current_discount,
-                        "paid_now": pay_now_for_this,
-                        "amount_paid": new_paid,
-                        "remaining": new_remaining
-                    })
-                else:
-                    results.append({
-                        "course_id": cid,
-                        "course_name": x["course_name"],
-                        "action": "created_no_payment",
-                        "total_fee": total_fee,
-                        "enrolled_fee": enrolled_fee,
-                        "discount": current_discount,
-                        "paid_now": 0,
-                        "amount_paid": 0,
-                        "remaining": enrolled_fee
-                    })
+                    "paid_now": 0,
+                    "amount_paid": 0,
+                    "remaining": enrolled_fee
+                })
 
         return results, None
 
@@ -481,12 +387,41 @@ def register_student_courses(
         return None, str(e)
 
 
+def allocate_payment_sequential_exact(courses, payment):
+    """
+    توزيع الدفعة بالتساوي على الكورسات - بدون تقريب
+    """
+    allocations = []
+    remaining_payment = payment
+    num_courses = len(courses)
+    
+    if num_courses == 0:
+        return allocations, remaining_payment
+    
+    # توزيع الدفعة بالتساوي على الكورسات
+    base_allocation = remaining_payment / num_courses
+    
+    for i, course in enumerate(courses):
+        course_id = course["id"]
+        course_remaining = float(course.get("remaining_amount", 0) or 0)
+        
+        # المبلغ المخصص لهذا الكورس
+        alloc_amount = base_allocation
+        
+        # لو المبلغ المخصص أكبر من المتبقي، نأخذ فقط المتبقي
+        if alloc_amount > course_remaining:
+            alloc_amount = course_remaining
+        
+        allocations.append({
+            "course_id": course_id,
+            "alloc": alloc_amount
+        })
+        
+        remaining_payment -= alloc_amount
+    
+    # لو فضل فيه جزء من الدفعة ومفيش كورس يقبله، بنرجع الباقي
+    return allocations, remaining_payment
 
-def round50(x):
-    return round(x / 50) * 50
-
-def floor50(x):
-    return math.floor(x / 50) * 50
 
 def allocate_payment_sequential(student_courses, amount):
     """
@@ -555,7 +490,7 @@ def allocate_payment_sequential(student_courses, amount):
     return allocations, leftover
 
 
-def metric_card(title, value, color="#8A2BE2"):
+def metric_card(title, value, color="#2A2AC2"):
     st.markdown(
         f"""
         <div style="
@@ -1328,7 +1263,7 @@ elif page == "الكورسات":
 elif page == "إدارة الطلاب":
     st.markdown('<div class="main-header">🎓 إدارة الطلاب</div>', unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["➕ إضافة طالب", "📋 عرض الطلاب","➕ تسجيل كورس جديد", "💰 الطلاب اللي عليهم باقي", "💵 تسجيل دفعة جديدة "])
+    tab1, tab2, tab3 = st.tabs(["➕ إضافة طالب", "📋 عرض الطلاب","➕ تسجيل كورس جديد"])
 
     # --- إضافة طالب ---
     with tab1:
@@ -1478,9 +1413,9 @@ elif page == "إدارة الطلاب":
     with tab3:
         st.markdown('<div class="section-header">➕ تسجيل طالب في كورسات جديدة</div>', unsafe_allow_html=True)
 
-        # استخدام Session State للخصم
-        if 'discount_percent' not in st.session_state:
-            st.session_state.discount_percent = 0
+        # استخدام Session State للخصم الجديد
+        if 'fixed_discount' not in st.session_state:
+            st.session_state.fixed_discount = 0
 
         # اختيار الجامعة (فلتر)
         universities_df = get_universities()
@@ -1549,26 +1484,35 @@ elif page == "إدارة الطلاب":
                                         ["cash","instapay","vodafone","card","other"],
                                         format_func=lambda x: {"cash":"نقداً","instapay":"InstaPay","vodafone":"Vodafone Cash","card":"بطاقة","other":"أخرى"}[x])
             
-            # خيارات الخصم (فقط لو full)
+            # خيارات الخصم الجديدة (فقط لو full)
             if payment_option == "full" and selected_course_ids:
                 st.markdown("### 🎟️ تطبيق خصم")
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    if st.button("10%"):
-                        st.session_state.discount_percent = 10
+                    if st.button("100 جنيه"):
+                        st.session_state.fixed_discount = 100
+                        st.rerun()
+                    if st.button("200 جنيه"):
+                        st.session_state.fixed_discount = 200
                         st.rerun()
                 with col2:
-                    if st.button("15%"):
-                        st.session_state.discount_percent = 15
+                    if st.button("300 جنيه"):
+                        st.session_state.fixed_discount = 300
+                        st.rerun()
+                    if st.button("400 جنيه"):
+                        st.session_state.fixed_discount = 400
                         st.rerun()
                 with col3:
+                    if st.button("500 جنيه"):
+                        st.session_state.fixed_discount = 500
+                        st.rerun()
                     if st.button("No Discount"):
-                        st.session_state.discount_percent = 0
+                        st.session_state.fixed_discount = 0
                         st.rerun()
                 
-                st.info(f"**الخصم الحالي: {st.session_state.discount_percent}%**")
+                st.info(f"**الخصم الحالي: {st.session_state.fixed_discount} جنيه**")
             else:
-                st.session_state.discount_percent = 0
+                st.session_state.fixed_discount = 0
 
             # عرض تفاصيل المبلغ
             total = 0.0
@@ -1598,30 +1542,23 @@ elif page == "إدارة الطلاب":
                 st.info("اختر على الأقل كورس واحد لحساب المبلغ.")
                 st.stop()
 
-            # حساب الخصم
-            discount_amount = 0.0
-            if payment_option == "full" and st.session_state.discount_percent > 0:
-                discount_amount = total * st.session_state.discount_percent / 100
-                discount_amount = round(discount_amount / 50) * 50
-
+            # حساب الخصم الجديد
+            discount_amount = st.session_state.fixed_discount
             final_total = total - discount_amount
+            if final_total < 0:
+                final_total = 0
 
-            # توزيع المبلغ النهائي بالتساوي على الكورسات مع تقريب لأقرب 50
+            # توزيع المبلغ النهائي بالتساوي على الكورسات - بدون تقريب
             num_courses = len(selected_course_ids)
             per_course_amount = 0.0
             if num_courses > 0:
                 per_course_amount = final_total / num_courses
-                per_course_amount = round(per_course_amount / 50) * 50
-                # تعديل آخر كورس لضمان المجموع
-                remaining_to_adjust = final_total - (per_course_amount * num_courses)
-                last_course_amount = per_course_amount + remaining_to_adjust
-                last_course_amount = round(last_course_amount / 50) * 50
 
         st.markdown("---")
         st.subheader(" 💰 تفاصيل المبلغ والكورسات")
 
         for i, (nm, amt) in enumerate(details):
-            display_amount = per_course_amount if i < num_courses - 1 else last_course_amount
+            display_amount = per_course_amount
             st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 10px; border:1px solid #ddd; border-radius:8px; margin-bottom:5px; background-color:#f9f9f9;'>"
                         f"<strong>{nm}</strong>"
                         f"<span>{display_amount:.2f} جنيه (السعر الأصلي: {amt:.2f})</span>"
@@ -1636,7 +1573,7 @@ elif page == "إدارة الطلاب":
         # كارت الخصم (لو موجود)
         if discount_amount > 0:
             st.markdown(f"<div style='display:flex; justify-content:space-between; padding:10px; border:2px solid #4CAF50; border-radius:8px; margin-top:10px; background-color:#e8f5e9;'>"
-                        f"<strong>خصم {st.session_state.discount_percent}%</strong>"
+                        f"<strong>خصم مبلغ ثابت</strong>"
                         f"<span>تم خصم {discount_amount:.2f} جنيه</span>"
                         f"</div>", unsafe_allow_html=True)
 
@@ -1654,22 +1591,17 @@ elif page == "إدارة الطلاب":
             st.warning(f"المبلغ المدخل أكبر من الإجمالي ({max_possible:.2f}) — سيتم استخدام الحد الأقصى تلقائيًا.")
             initial_payment = max_possible
 
-        # عرض توزيع الدفعة الأولية بالتساوي
+        # عرض توزيع الدفعة الأولية بالتساوي - بدون تقريب
         if initial_payment > 0 and num_courses > 0:
             base_payment = initial_payment / num_courses
-            base_payment = round(base_payment / 50) * 50
-            remaining_payment_adjust = initial_payment - (base_payment * num_courses)
-            last_payment_amount = base_payment + remaining_payment_adjust
-            last_payment_amount = round(last_payment_amount / 50) * 50
             st.markdown("### توزيع الدفعة الأولية")
             for i, (nm, _) in enumerate(details):
-                payment_display = base_payment if i < num_courses - 1 else last_payment_amount
                 st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 10px; border:1px solid #ddd; border-radius:8px; margin-bottom:5px;'>"
                             f"<strong>{nm}</strong>"
-                            f"<span>{payment_display:.2f} جنيه</span>"
+                            f"<span>{base_payment:.2f} جنيه</span>"
                             f"</div>", unsafe_allow_html=True)
 
-        st.caption("لو حبيت تدفع جزء من المبلغ دلوقتي، اكتب المبلغ هنا، وسيتم توزيعه بالتساوي على الكورسات المحددة مع تقريب لأقرب 50 جنيه.")
+        st.caption("لو حبيت تدفع جزء من المبلغ دلوقتي، اكتب المبلغ هنا، وسيتم توزيعه بالتساوي على الكورسات المحددة.")
 
         st.markdown("---")
         st.subheader("✅ تنفيذ التسجيل")
@@ -1686,7 +1618,7 @@ elif page == "إدارة الطلاب":
                     payment_option,
                     initial_payment,
                     payment_method,
-                    st.session_state.discount_percent,
+                    st.session_state.fixed_discount,  # استخدام الخصم الجديد
                     courses_df
                 )
                 if err:
@@ -1932,11 +1864,12 @@ elif page == "تسجيل دفعة":
                 student_courses = student_courses.sort_values(by="id")
 
             display_df = student_courses[[
-                "name_course", "total_fee", "discount", "amount_paid", "remaining_amount"
+                "name_course", "total_fee", "enrolled_fee", "discount", "amount_paid", "remaining_amount"
             ]].rename(columns={
                 "name_course": "الكورس",
                 "total_fee": "السعر الأصلي",
-                "discount": "الخصم (%)",
+                "enrolled_fee": "السعر بعد الخصم",
+                "discount": "الخصم (جنيه)",
                 "amount_paid": "المدفوع",
                 "remaining_amount": "المتبقي"
             })
@@ -1950,7 +1883,7 @@ elif page == "تسجيل دفعة":
                 amount_paid = st.number_input(
                     "المبلغ المدفوع",
                     min_value=0.0,
-                    step=50.0,
+                    step=1.0,  # تغيير من 50 إلى 1 علشان نعرف ندخل أي مبلغ
                     max_value=float(total_remaining),
                     key="payment_amount"
                 )
@@ -1983,7 +1916,7 @@ elif page == "تسجيل دفعة":
 
             # عرض التوزيع المقترح في الواجهة قبل التأكيد
             if amount_paid > 0:
-                allocations, leftover = allocate_payment_sequential(student_courses_db, amount_paid)
+                allocations, leftover = allocate_payment_sequential_exact(student_courses_db, amount_paid)
                 st.markdown("### 📊 التوزيع المقترح للدفعة")
                 total_allocated = 0.0
                 for alloc in allocations:
@@ -2004,7 +1937,7 @@ elif page == "تسجيل دفعة":
                         )
                         total_allocated += alloc["alloc"]
                 if leftover > 0:
-                    st.warning(f"تبقى مبلغ صغير لم يتم توزيعه: {leftover:.2f} جنيه (أقل من 50). يمكنك تعديل المبلغ المدفوع أو السماح بتوزيع هذا الباقي يدوياً).")
+                    st.warning(f"تبقى مبلغ صغير لم يتم توزيعه: {leftover:.2f} جنيه. يمكنك تعديل المبلغ المدفوع أو السماح بتوزيع هذا الباقي يدوياً).")
                 st.markdown(f"**الإجمالي المقترح للإيداع:** {total_allocated:.2f} جنيه")
 
             if st.button("💾 تسجيل الدفعة", key="register_payment_btn"):
@@ -2023,7 +1956,7 @@ elif page == "تسجيل دفعة":
                                 st.error("لا يوجد مبالغ متبقية لهذا الطالب.")
                                 st.stop()
 
-                            allocations, leftover = allocate_payment_sequential(student_courses_db, amount_paid)
+                            allocations, leftover = allocate_payment_sequential_exact(student_courses_db, amount_paid)
                             total_recorded = 0.0
 
                             for alloc in allocations:
@@ -2068,7 +2001,7 @@ elif page == "تسجيل دفعة":
                             if total_recorded > 0:
                                 st.success(f"✅ تم تسجيل دفعة بقيمة {total_recorded:.2f} جنيه بنجاح")
                                 if leftover > 0:
-                                    st.warning(f"تبقى مبلغ صغير لم يتم توزيعه: {leftover:.2f} جنيه (أقل من 50).")
+                                    st.warning(f"تبقى مبلغ صغير لم يتم توزيعه: {leftover:.2f} جنيه.")
                                 st.rerun()
                             else:
                                 st.error("لم يتم تسجيل أي دفعات. تأكد من القيم وحاول مرة أخرى.")
