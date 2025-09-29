@@ -124,22 +124,34 @@ def get_courses():
 # ---------------------------
 # دوال للتعامل مع الطلاب
 # ---------------------------
-def add_student(name, phone, gmail, university_id, department):
+def add_student(name, phone, gmail, university_id, department, commission=None):
+    """إضافة طالب جديد مع إمكانية إضافة commission"""
     try:
-        response = supabase.table("students").insert({
+        # 🔥 بناء بيانات الطالب
+        student_data = {
             "name": name,
             "phone": phone,
             "gmail": gmail,
             "university_id": int(university_id) if university_id else None,
             "department": department
-        }).execute()
+        }
         
-        # 🔥 التصحيح: نفس المنطق
+        # 🔥 إضافة commission إذا تم تمريره
+        if commission is not None and commission != "":
+            student_data["commission"] = commission
+
+        response = supabase.table("students").insert(student_data).execute()
+        
         if hasattr(response, 'data') and response.data:
+            # مسح الكاش بعد الإضافة الناجحة
+            st.cache_data.clear()
             return response.data, None
         else:
             error_msg = getattr(response, 'error', None)
             if error_msg:
+                # 🔥 معالجة unique constraint error
+                if "duplicate key" in str(error_msg) or "23505" in str(error_msg):
+                    return None, "رقم الهاتف مسجل بالفعل لطالب آخر"
                 return None, str(error_msg)
             else:
                 return None, "Unknown error occurred"
